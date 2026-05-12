@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
-
-import '../models/support_request.dart';
-import '../services/backend_orchestrator.dart';
-import '../theme.dart';
-import 'volunteer_admin_page.dart';
+import 'package:yanyana_p/core/services/backend_orchestrator.dart';
+import 'package:yanyana_p/core/theme/theme.dart';
+import 'package:yanyana_p/features/admin/volunteer_admin_page.dart';
+import 'package:yanyana_p/shared/models/support_request.dart';
 
 class AccessibilityPage extends StatefulWidget {
   const AccessibilityPage({super.key});

@@ -1,4 +1,4 @@
-import '../models/support_request.dart';
+import 'package:yanyana_p/shared/models/support_request.dart';
 
 /// Selects the most suitable volunteer for a request (mock logic).
 class MatchingEngine {

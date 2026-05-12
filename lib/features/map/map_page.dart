@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import '../models/accessibility_review.dart';
-import '../models/accessible_place.dart';
-import '../services/database_bridge.dart';
-import '../theme.dart';
+import 'package:yanyana_p/core/services/database_bridge.dart';
+import 'package:yanyana_p/core/theme/theme.dart';
+import 'package:yanyana_p/shared/models/accessibility_review.dart';
+import 'package:yanyana_p/shared/models/accessible_place.dart';
 
 class MapPage extends StatefulWidget {
   const MapPage({super.key});

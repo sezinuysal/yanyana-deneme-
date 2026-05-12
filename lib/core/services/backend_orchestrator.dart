@@ -1,8 +1,9 @@
-import '../models/support_request.dart';
-import '../models/accessible_place.dart';
-import '../models/volunteer_application.dart';
-import '../models/app_user.dart';
-import '../models/community_room.dart';
+import 'package:yanyana_p/shared/models/accessible_place.dart';
+import 'package:yanyana_p/shared/models/app_user.dart';
+import 'package:yanyana_p/shared/models/community_room.dart';
+import 'package:yanyana_p/shared/models/support_request.dart';
+import 'package:yanyana_p/shared/models/volunteer_application.dart';
+
 import 'database_bridge.dart';
 import 'matching_engine.dart';
 import 'notification_dispatcher.dart';

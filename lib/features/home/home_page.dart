@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
-import '../theme.dart';
+import 'package:yanyana_p/core/theme/theme.dart';
+import 'package:yanyana_p/features/matching/matching_module.dart';
+import 'package:yanyana_p/features/messages/messages_module.dart';
+import 'package:yanyana_p/features/notifications/notifications_module.dart';
 
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
@@ -14,7 +17,7 @@ class HomePage extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildTopBar(),
+              _buildTopBar(context),
               const SizedBox(height: 22),
               _buildWelcomeCard(),
               const SizedBox(height: 18),
@@ -38,7 +41,7 @@ class HomePage extends StatelessWidget {
     );
   }
 
-  Widget _buildTopBar() {
+  Widget _buildTopBar(BuildContext context) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -65,36 +68,47 @@ class HomePage extends StatelessWidget {
             ),
           ],
         ),
-        Container(
-          width: 46,
-          height: 46,
-          decoration: BoxDecoration(
-            color: YanYanaColors.surface,
-            shape: BoxShape.circle,
-            boxShadow: YanYanaShadows.soft,
-          ),
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              const Icon(
-                Icons.notifications_rounded,
-                color: YanYanaColors.primary,
-                size: 24,
+        GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute<void>(
+                builder: (_) => const NotificationsModulePage(),
               ),
-              Positioned(
-                top: 11,
-                right: 12,
-                child: Container(
-                  width: 9,
-                  height: 9,
-                  decoration: BoxDecoration(
-                    color: YanYanaColors.sos,
-                    shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white, width: 1.5),
+            );
+          },
+          child: Container(
+            width: 46,
+            height: 46,
+            decoration: BoxDecoration(
+              color: YanYanaColors.surface,
+              shape: BoxShape.circle,
+              boxShadow: YanYanaShadows.soft,
+            ),
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                const Icon(
+                  Icons.notifications_rounded,
+                  color: YanYanaColors.primary,
+                  size: 24,
+                ),
+                Positioned(
+                  top: 11,
+                  right: 12,
+                  child: Container(
+                    width: 9,
+                    height: 9,
+                    decoration: BoxDecoration(
+                      color: YanYanaColors.sos,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 1.5),
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ],
@@ -341,10 +355,32 @@ class HomePage extends StatelessWidget {
         childAspectRatio: 0.78,
       ),
       itemBuilder: (context, index) {
+        final label = actions[index]['label'] as String;
+        VoidCallback? onTap;
+        if (label == 'Destek İste') {
+          onTap = () {
+            Navigator.push(
+              context,
+              MaterialPageRoute<void>(
+                builder: (_) => const MatchingModulePage(),
+              ),
+            );
+          };
+        } else if (label == 'Mesajlar') {
+          onTap = () {
+            Navigator.push(
+              context,
+              MaterialPageRoute<void>(
+                builder: (_) => const MessagesModulePage(),
+              ),
+            );
+          };
+        }
         return _QuickActionItem(
           icon: actions[index]['icon'] as IconData,
-          label: actions[index]['label'] as String,
+          label: label,
           color: actions[index]['color'] as Color,
+          onTap: onTap,
         );
       },
     );
@@ -412,16 +448,18 @@ class _QuickActionItem extends StatelessWidget {
   final IconData icon;
   final String label;
   final Color color;
+  final VoidCallback? onTap;
 
   const _QuickActionItem({
     required this.icon,
     required this.label,
     required this.color,
+    this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Column(
+    final child = Column(
       children: [
         Container(
           width: 58,
@@ -444,6 +482,12 @@ class _QuickActionItem extends StatelessWidget {
           textAlign: TextAlign.center,
         ),
       ],
+    );
+    if (onTap == null) return child;
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: child,
     );
   }
 }

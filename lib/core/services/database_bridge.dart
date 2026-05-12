@@ -1,9 +1,10 @@
-import '../data/mock_data.dart';
-import '../models/accessibility_review.dart';
-import '../models/accessible_place.dart';
-import '../models/app_user.dart';
-import '../models/community_room.dart';
-import '../models/volunteer_application.dart';
+import 'package:yanyana_p/shared/data/mock_data.dart';
+import 'package:yanyana_p/shared/models/accessibility_review.dart';
+import 'package:yanyana_p/shared/models/accessible_place.dart';
+import 'package:yanyana_p/shared/models/app_user.dart';
+import 'package:yanyana_p/shared/models/community_room.dart';
+import 'package:yanyana_p/shared/models/volunteer_application.dart';
+
 import 'place_data_service.dart';
 
 /// Local mock database bridge.

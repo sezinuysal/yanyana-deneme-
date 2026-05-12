@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-
-import '../models/community_room.dart';
-import '../services/backend_orchestrator.dart';
-import '../theme.dart';
+import 'package:yanyana_p/core/services/backend_orchestrator.dart';
+import 'package:yanyana_p/core/theme/theme.dart';
+import 'package:yanyana_p/features/rooms/rooms_module.dart';
+import 'package:yanyana_p/shared/models/community_room.dart';
 
 class CommunityPage extends StatefulWidget {
   const CommunityPage({super.key});
@@ -223,22 +223,38 @@ class _CommunityPageState extends State<CommunityPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'Topluluk Odaları',
-                style: TextStyle(
-                  color: YanYanaColors.textDark,
-                  fontSize: 23,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: -0.5,
-                ),
-              ),
-              const SizedBox(height: 6),
-              const Text(
-                'Destek, sohbet ve paylaşım için güvenli alanlar.',
-                style: TextStyle(
-                  color: YanYanaColors.textMuted,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
+              GestureDetector(
+                behavior: HitTestBehavior.translucent,
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute<void>(
+                      builder: (_) => const RoomsModulePage(),
+                    ),
+                  );
+                },
+                child: const Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Topluluk Odaları',
+                      style: TextStyle(
+                        color: YanYanaColors.textDark,
+                        fontSize: 23,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: -0.5,
+                      ),
+                    ),
+                    SizedBox(height: 6),
+                    Text(
+                      'Destek, sohbet ve paylaşım için güvenli alanlar.',
+                      style: TextStyle(
+                        color: YanYanaColors.textMuted,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
                 ),
               ),
               const SizedBox(height: 14),

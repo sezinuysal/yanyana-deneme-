@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
-import '../theme.dart';
-import 'home_page.dart';
-import 'map_page.dart';
-import 'community_page.dart';
-import 'guide_donation_page.dart';
-import 'accessibility_page.dart';
-import 'profile_page.dart';
+import 'package:yanyana_p/core/theme/theme.dart';
+import 'package:yanyana_p/features/community/community_page.dart';
+import 'package:yanyana_p/features/community/guide_donation_page.dart';
+import 'package:yanyana_p/features/emergency/accessibility_page.dart';
+import 'package:yanyana_p/features/home/home_page.dart';
+import 'package:yanyana_p/features/map/map_page.dart';
+import 'package:yanyana_p/features/profile/profile_page.dart';
 
 class MainPage extends StatefulWidget {
   const MainPage({super.key});

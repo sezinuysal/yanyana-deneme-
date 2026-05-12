@@ -1,11 +1,9 @@
-import 'package:flutter/material.dart';
-
-import '../models/accessible_place.dart';
-import '../models/app_user.dart';
-import '../models/community_room.dart';
-import '../models/support_request.dart';
-import '../models/volunteer_application.dart';
-import '../theme.dart';
+import 'package:yanyana_p/core/theme/theme.dart';
+import 'package:yanyana_p/shared/models/accessible_place.dart';
+import 'package:yanyana_p/shared/models/app_user.dart';
+import 'package:yanyana_p/shared/models/community_room.dart';
+import 'package:yanyana_p/shared/models/support_request.dart';
+import 'package:yanyana_p/shared/models/volunteer_application.dart';
 
 class MockData {
   static const AppUser currentUser = AppUser(

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:yanyana_p/core/theme/theme.dart';
+import 'package:yanyana_p/shared/models/accessible_place.dart';
 
-import '../models/accessible_place.dart';
-import '../theme.dart';
 import 'database_bridge.dart';
 
 /// Fetches real places from OpenStreetMap / Overpass (future),

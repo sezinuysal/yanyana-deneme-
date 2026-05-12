@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import '../theme.dart';
-import 'login_page.dart';
-import 'volunteer_admin_page.dart';
+import 'package:yanyana_p/core/theme/theme.dart';
+import 'package:yanyana_p/features/admin/volunteer_admin_page.dart';
+import 'package:yanyana_p/features/auth/login_page.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});

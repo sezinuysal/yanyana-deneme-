@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
-
-import '../models/volunteer_application.dart';
-import '../services/backend_orchestrator.dart';
-import '../theme.dart';
+import 'package:yanyana_p/core/services/backend_orchestrator.dart';
+import 'package:yanyana_p/core/theme/theme.dart';
+import 'package:yanyana_p/shared/models/volunteer_application.dart';
 
 class VolunteerAdminPage extends StatefulWidget {
   const VolunteerAdminPage({super.key});

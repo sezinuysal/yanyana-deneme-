@@ -1,4 +1,4 @@
-import '../models/volunteer_application.dart';
+import 'package:yanyana_p/shared/models/volunteer_application.dart';
 
 /// Mock volunteer identity/status verification.
 /// NOTE: E-Devlet (or any official verification) is NOT implemented in this prototype.

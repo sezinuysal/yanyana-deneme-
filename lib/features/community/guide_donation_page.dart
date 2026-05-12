@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
-
-import '../data/mock_data.dart';
-import '../theme.dart';
+import 'package:yanyana_p/core/theme/theme.dart';
+import 'package:yanyana_p/shared/data/mock_data.dart';
 
 class GuideDonationPage extends StatefulWidget {
   const GuideDonationPage({super.key});

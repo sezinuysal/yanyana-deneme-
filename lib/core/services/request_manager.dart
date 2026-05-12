@@ -1,4 +1,4 @@
-import '../models/support_request.dart';
+import 'package:yanyana_p/shared/models/support_request.dart';
 import 'matching_engine.dart';
 import 'notification_dispatcher.dart';
 
