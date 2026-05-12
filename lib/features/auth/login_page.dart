@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:yanyana_p/core/services/backend_orchestrator.dart';
 import 'package:yanyana_p/core/theme/theme.dart';
 import 'package:yanyana_p/features/home/main_page.dart';
 
@@ -191,16 +192,21 @@ class _LoginFormState extends State<_LoginForm> {
 
     setState(() => _loading = true);
 
-    await Future.delayed(const Duration(milliseconds: 900));
-
-    if (!mounted) return;
-
-    setState(() => _loading = false);
-
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (_) => const MainPage()),
-    );
+    try {
+      await BackendOrchestrator.instance.authService.signInWithEmailAndPassword(
+        _emailCtrl.text.trim(),
+        _passCtrl.text,
+      );
+      if (!mounted) return;
+      setState(() => _loading = false);
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const MainPage()),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+    }
   }
 
   @override
@@ -348,16 +354,23 @@ class _RegisterFormState extends State<_RegisterForm> {
 
     setState(() => _loading = true);
 
-    await Future.delayed(const Duration(milliseconds: 900));
-
-    if (!mounted) return;
-
-    setState(() => _loading = false);
-
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (_) => const MainPage()),
-    );
+    try {
+      await BackendOrchestrator.instance.authService.registerWithEmailAndPassword(
+        _nameCtrl.text.trim(),
+        _emailCtrl.text.trim(),
+        _passCtrl.text,
+        _role,
+      );
+      if (!mounted) return;
+      setState(() => _loading = false);
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const MainPage()),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+    }
   }
 
   @override
