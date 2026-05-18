@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:yanyana_p/features/auth/login_page.dart';
+import 'package:yanyana_p/features/home/main_page.dart';
 
 void main() {
   runApp(const YanYanaApp());
@@ -20,7 +20,7 @@ class YanYanaApp extends StatelessWidget {
         ),
         useMaterial3: true,
       ),
-      home: const LoginPage(),
+      home: const MainPage(),
     );
   }
 }
