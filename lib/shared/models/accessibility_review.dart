@@ -2,6 +2,7 @@ class AccessibilityReview {
   final String id;
   final String placeId;
   final String userId;
+  final String userName;
   final bool wheelchairAccessible;
   final bool hasRamp;
   final bool hasElevator;
@@ -16,6 +17,7 @@ class AccessibilityReview {
     required this.id,
     required this.placeId,
     required this.userId,
+    this.userName = '',
     required this.wheelchairAccessible,
     required this.hasRamp,
     required this.hasElevator,
@@ -27,4 +29,3 @@ class AccessibilityReview {
     required this.createdAt,
   });
 }
-

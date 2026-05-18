@@ -209,7 +209,7 @@ class _GuideDonationPageState extends State<GuideDonationPage> {
           ),
           const SizedBox(height: 14),
           _sectionCard(
-            title: 'Bağış/Destek Formu (Mock)',
+            title: 'Destek niyeti formu',
             icon: Icons.edit_note_rounded,
             color: YanYanaColors.primary,
             child: Column(
@@ -270,7 +270,10 @@ class _GuideDonationPageState extends State<GuideDonationPage> {
                     onPressed: () {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
-                          content: Text('Bağış/destek talebiniz prototip olarak kaydedildi.'),
+                          content: Text(
+                            'Teşekkürler. Gerçek ödeme işlemi yapılmadı; '
+                            'niyetiniz yalnızca bu cihazda not olarak kaydedildi.',
+                          ),
                         ),
                       );
                       _noteCtrl.clear();
