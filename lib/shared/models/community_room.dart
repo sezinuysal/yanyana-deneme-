@@ -4,6 +4,7 @@ class CommunityRoom {
   final String category;
   final String description;
   final int memberCount;
+  final List<String> accessibilityTags;
   final bool isVoiceEnabled;
   final bool isAuthorizedRoom;
   final String createdByUserId;
@@ -14,6 +15,7 @@ class CommunityRoom {
     required this.category,
     required this.description,
     this.memberCount = 1,
+    this.accessibilityTags = const [],
     this.isVoiceEnabled = false,
     this.isAuthorizedRoom = false,
     this.createdByUserId = '',
@@ -21,6 +23,7 @@ class CommunityRoom {
 
   CommunityRoom copyWith({
     int? memberCount,
+    List<String>? accessibilityTags,
   }) {
     return CommunityRoom(
       id: id,
@@ -28,6 +31,7 @@ class CommunityRoom {
       category: category,
       description: description,
       memberCount: memberCount ?? this.memberCount,
+      accessibilityTags: accessibilityTags ?? this.accessibilityTags,
       isVoiceEnabled: isVoiceEnabled,
       isAuthorizedRoom: isAuthorizedRoom,
       createdByUserId: createdByUserId,
@@ -40,6 +44,7 @@ class CommunityRoom {
         'category': category,
         'description': description,
         'memberCount': memberCount,
+        'accessibilityTags': accessibilityTags,
         'isVoiceEnabled': isVoiceEnabled,
         'isAuthorizedRoom': isAuthorizedRoom,
         'createdByUserId': createdByUserId,
@@ -52,6 +57,10 @@ class CommunityRoom {
       category: json['category'] as String,
       description: json['description'] as String,
       memberCount: (json['memberCount'] as num?)?.toInt() ?? 1,
+      accessibilityTags: (json['accessibilityTags'] as List<dynamic>?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          const [],
       isVoiceEnabled: json['isVoiceEnabled'] as bool? ?? false,
       isAuthorizedRoom: json['isAuthorizedRoom'] as bool? ?? false,
       createdByUserId: json['createdByUserId'] as String? ?? '',

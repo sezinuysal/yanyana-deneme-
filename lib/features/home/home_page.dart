@@ -3,7 +3,10 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:yanyana_p/core/services/backend_orchestrator.dart';
 import 'package:yanyana_p/core/theme/theme.dart';
+import 'package:yanyana_p/core/utils/relative_time.dart';
 import 'package:yanyana_p/features/community/community_page.dart';
+import 'package:yanyana_p/features/community/widgets/community_post_preview_card.dart';
+import 'package:yanyana_p/features/community/widgets/community_story_preview_card.dart';
 import 'package:yanyana_p/features/home/home_palette.dart';
 import 'package:yanyana_p/features/home/main_page.dart';
 import 'package:yanyana_p/features/home/success_stories_page.dart';
@@ -392,13 +395,6 @@ class _HomePageState extends State<HomePage> {
     return list.take(5).toList();
   }
 
-  String _relativeTime(DateTime t) {
-    final diff = DateTime.now().difference(t);
-    if (diff.inMinutes < 60) return '${diff.inMinutes.clamp(1, 999)} dk önce';
-    if (diff.inHours < 24) return '${diff.inHours} sa önce';
-    return '${diff.inDays} gün önce';
-  }
-
   @override
   Widget build(BuildContext context) {
     final user = _user ?? _backend.currentUser;
@@ -470,7 +466,7 @@ class _HomePageState extends State<HomePage> {
                   ..._notifications.take(3).map(
                         (n) => _ActivityTile(
                           notification: n,
-                          timeLabel: _relativeTime(n.createdAt),
+                          timeLabel: formatRelativeTime(n.createdAt),
                         ),
                       ),
                 const SizedBox(height: 22),
@@ -490,9 +486,9 @@ class _HomePageState extends State<HomePage> {
                   )
                 else
                   ..._communityPosts.take(2).map(
-                        (p) => _CommunityPreviewCard(
+                        (p) => CommunityPostPreviewCard(
                           post: p,
-                          timeLabel: _relativeTime(p.createdAt),
+                          timeLabel: formatRelativeTime(p.createdAt),
                           onTap: _goCommunity,
                         ),
                       ),
@@ -516,8 +512,9 @@ class _HomePageState extends State<HomePage> {
                   )
                 else
                   ..._successStories.take(2).map(
-                        (s) => _StoryPreviewCard(
+                        (s) => CommunityStoryPreviewCard(
                           story: s,
+                          timeLabel: formatRelativeTime(s.createdAt),
                           onTap: () => _goSuccessStories(),
                         ),
                       ),
@@ -1183,149 +1180,6 @@ class _PastelEmptyCard extends StatelessWidget {
             ),
           ],
         ],
-      ),
-    );
-  }
-}
-
-class _CommunityPreviewCard extends StatelessWidget {
-  final CommunityPost post;
-  final String timeLabel;
-  final VoidCallback onTap;
-
-  const _CommunityPreviewCard({
-    required this.post,
-    required this.timeLabel,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(22),
-          onTap: onTap,
-          child: Ink(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: HomePalette.softMint,
-              borderRadius: BorderRadius.circular(22),
-              border: Border.all(color: Colors.white.withOpacity(0.9)),
-              boxShadow: YanYanaShadows.soft,
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  post.title,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w800,
-                    color: HomePalette.textDark,
-                    fontSize: 15,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  post.body,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: HomePalette.textMuted,
-                    fontSize: 13,
-                    height: 1.35,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  '${post.authorName} · $timeLabel',
-                  style: const TextStyle(
-                    color: HomePalette.textMuted,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _StoryPreviewCard extends StatelessWidget {
-  final SuccessStory story;
-  final VoidCallback onTap;
-
-  const _StoryPreviewCard({required this.story, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(22),
-          onTap: onTap,
-          child: Ink(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: HomePalette.softYellow,
-              borderRadius: BorderRadius.circular(22),
-              border: Border.all(color: Colors.white.withOpacity(0.9)),
-              boxShadow: YanYanaShadows.soft,
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    const Icon(
-                      Icons.auto_awesome_rounded,
-                      color: Color(0xFFF59E0B),
-                      size: 20,
-                    ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        story.title,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w800,
-                          color: HomePalette.textDark,
-                          fontSize: 15,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  story.content,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: HomePalette.textMuted,
-                    fontSize: 13,
-                    height: 1.35,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  story.authorName,
-                  style: const TextStyle(
-                    color: HomePalette.primary,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
       ),
     );
   }

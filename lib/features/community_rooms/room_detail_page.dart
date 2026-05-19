@@ -1,0 +1,289 @@
+import 'package:flutter/material.dart';
+import 'package:yanyana_p/core/theme/theme.dart';
+import 'package:yanyana_p/features/community_rooms/data/mock_community_rooms_data.dart';
+import 'package:yanyana_p/features/community_rooms/widgets/room_actions_bar.dart';
+import 'package:yanyana_p/features/community_rooms/widgets/room_activity_bar.dart';
+import 'package:yanyana_p/features/community_rooms/widgets/room_chat_composer.dart';
+import 'package:yanyana_p/features/community_rooms/widgets/room_detail_header.dart';
+import 'package:yanyana_p/features/community_rooms/widgets/room_members_preview.dart';
+import 'package:yanyana_p/features/community_rooms/widgets/room_message_bubble.dart';
+import 'package:yanyana_p/features/community_rooms/widgets/room_pinned_guidelines.dart';
+import 'package:yanyana_p/shared/models/community_room.dart';
+import 'package:yanyana_p/shared/models/room_message.dart';
+
+/// Mock room detail with local chat (no Firebase).
+///
+/// Distinct from the Firebase-backed detail page under `features/rooms/`.
+class RoomDetailPage extends StatefulWidget {
+  final CommunityRoom room;
+  final bool initiallyJoined;
+  final ValueChanged<bool>? onJoinChanged;
+
+  const RoomDetailPage({
+    super.key,
+    required this.room,
+    this.initiallyJoined = false,
+    this.onJoinChanged,
+  });
+
+  @override
+  State<RoomDetailPage> createState() => _RoomDetailPageState();
+}
+
+class _RoomDetailPageState extends State<RoomDetailPage> {
+  late bool _joined;
+  late bool _muted;
+  late List<RoomMessage> _messages;
+  final _messageCtrl = TextEditingController();
+  final _scrollCtrl = ScrollController();
+  int _messageSeq = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _joined = widget.initiallyJoined;
+    _muted = false;
+    _messages = MockCommunityRoomsData.seedMessagesFor(widget.room.id);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
+  }
+
+  @override
+  void dispose() {
+    _messageCtrl.dispose();
+    _scrollCtrl.dispose();
+    super.dispose();
+  }
+
+  void _scrollToBottom({bool animated = true}) {
+    if (!_scrollCtrl.hasClients) return;
+    final target = _scrollCtrl.position.maxScrollExtent;
+    if (animated) {
+      _scrollCtrl.animateTo(
+        target,
+        duration: const Duration(milliseconds: 280),
+        curve: Curves.easeOutCubic,
+      );
+    } else {
+      _scrollCtrl.jumpTo(target);
+    }
+  }
+
+  void _setJoined(bool value) {
+    setState(() => _joined = value);
+    widget.onJoinChanged?.call(value);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          value
+              ? '${widget.room.title} odasına katıldınız (yerel).'
+              : 'Odadan ayrıldınız (yerel).',
+        ),
+      ),
+    );
+  }
+
+  void _joinRoom() => _setJoined(true);
+
+  void _leaveRoom() => _setJoined(false);
+
+  void _toggleMute() {
+    setState(() => _muted = !_muted);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          _muted
+              ? 'Bildirimler sessize alındı (yerel).'
+              : 'Bildirimler açıldı (yerel).',
+        ),
+      ),
+    );
+  }
+
+  void _reportRoom() {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text(
+          'Odayı Bildir',
+          style: TextStyle(fontWeight: FontWeight.w900),
+        ),
+        content: const Text(
+          'Bu özellik yerel prototipte simüle edilir. '
+          'Gerçek uygulamada moderasyon ekibine iletilecektir.',
+          style: TextStyle(height: 1.45),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('İptal'),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Bildiriminiz alındı (yerel simülasyon).'),
+                ),
+              );
+            },
+            child: const Text('Gönder'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _sendMessage() {
+    final text = _messageCtrl.text.trim();
+    if (!_joined) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Mesaj göndermek için önce odaya katılın.')),
+      );
+      return;
+    }
+    if (text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Lütfen bir mesaj yazın.')),
+      );
+      return;
+    }
+
+    setState(() {
+      _messageSeq++;
+      _messages.add(
+        RoomMessage(
+          id: 'local-$_messageSeq',
+          roomId: widget.room.id,
+          authorName: MockCommunityRoomsData.currentUserName,
+          text: text,
+          sentAt: DateTime.now(),
+          isFromMe: true,
+        ),
+      );
+    });
+    _messageCtrl.clear();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final room = widget.room;
+    final activity = MockCommunityRoomsData.activityFor(room.id);
+    final participants = MockCommunityRoomsData.participantsFor(room.id);
+
+    return Scaffold(
+      backgroundColor: YanYanaColors.background,
+      body: Column(
+        children: [
+          Expanded(
+            child: CustomScrollView(
+              controller: _scrollCtrl,
+              slivers: [
+                SliverToBoxAdapter(
+                  child: RoomDetailHeader(
+                    room: room,
+                    onBack: () => Navigator.pop(context),
+                  ),
+                ),
+                SliverToBoxAdapter(
+                  child: RoomActivityBar(activity: activity),
+                ),
+                SliverToBoxAdapter(
+                  child: RoomMembersPreview(participants: participants),
+                ),
+                SliverToBoxAdapter(
+                  child: RoomPinnedGuidelines(
+                    items: MockCommunityRoomsData.pinnedGuidelines,
+                  ),
+                ),
+                SliverToBoxAdapter(
+                  child: RoomActionsBar(
+                    joined: _joined,
+                    muted: _muted,
+                    onJoin: _joinRoom,
+                    onLeave: _leaveRoom,
+                    onReport: _reportRoom,
+                    onToggleMute: _toggleMute,
+                  ),
+                ),
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
+                    child: Row(
+                      children: [
+                        const Text(
+                          'Sohbet',
+                          style: TextStyle(
+                            color: YanYanaColors.textDark,
+                            fontWeight: FontWeight.w900,
+                            fontSize: 16,
+                          ),
+                        ),
+                        const Spacer(),
+                        if (_joined)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: YanYanaColors.success.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Text(
+                              'Katıldın',
+                              style: TextStyle(
+                                color: YanYanaColors.success,
+                                fontWeight: FontWeight.w800,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+                if (_messages.isEmpty)
+                  const SliverToBoxAdapter(
+                    child: Padding(
+                      padding: EdgeInsets.all(32),
+                      child: Center(
+                        child: Text(
+                          'Henüz mesaj yok. İlk destekleyici mesajı sen yaz.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: YanYanaColors.textMuted,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                            height: 1.45,
+                          ),
+                        ),
+                      ),
+                    ),
+                  )
+                else
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 20),
+                    sliver: SliverList(
+                      delegate: SliverChildBuilderDelegate(
+                        (context, i) => RoomMessageBubble(
+                          message: _messages[i],
+                          showAuthor: !_messages[i].isFromMe,
+                        ),
+                        childCount: _messages.length,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          RoomChatComposer(
+            controller: _messageCtrl,
+            onSend: _sendMessage,
+            enabled: _joined,
+          ),
+        ],
+      ),
+    );
+  }
+}
