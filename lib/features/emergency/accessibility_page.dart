@@ -1,10 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:yanyana_p/audio_description_page.dart';
 import 'package:yanyana_p/core/services/backend_orchestrator.dart';
 import 'package:yanyana_p/features/home/main_page.dart';
 import 'package:yanyana_p/core/theme/theme.dart';
+
+import 'package:yanyana_p/features/admin/volunteer_admin_page.dart';
+import 'package:yanyana_p/live_caption_page.dart';
+import 'package:yanyana_p/push_notification_page.dart';
+import 'package:yanyana_p/safe_call_page.dart';
+import 'package:yanyana_p/shake_help_page.dart';
+
 import 'package:yanyana_p/features/admin/admin_dashboard_page.dart';
 import 'package:yanyana_p/features/home/trusted_contacts_page.dart';
+
 import 'package:yanyana_p/shared/models/support_request.dart';
+import 'package:yanyana_p/voice_command_page.dart';
 
 class AccessibilityPage extends StatefulWidget {
   const AccessibilityPage({super.key});
@@ -19,7 +29,9 @@ class _AccessibilityPageState extends State<AccessibilityPage> {
 
   Future<void> _run(Future<void> Function() action) async {
     if (_busy) return;
+
     setState(() => _busy = true);
+
     try {
       await action();
     } finally {
@@ -31,6 +43,7 @@ class _AccessibilityPageState extends State<AccessibilityPage> {
     await _run(() async {
       await _orchestrator.triggerSOS();
       if (!mounted) return;
+
       showDialog(
         context: context,
         builder: (_) => AlertDialog(
@@ -113,8 +126,11 @@ class _AccessibilityPageState extends State<AccessibilityPage> {
         status: 'Açık',
         assignedVolunteerName: null,
       );
+
       final updated = await _orchestrator.createSupportRequest(req);
+
       if (!mounted) return;
+
       showDialog(
         context: context,
         builder: (_) => AlertDialog(
@@ -169,6 +185,7 @@ class _AccessibilityPageState extends State<AccessibilityPage> {
                 ),
               ),
               const SizedBox(height: 14),
+
               _sectionCard(
                 title: 'Acil / Güvenli İletişim',
                 icon: Icons.shield_rounded,
@@ -189,10 +206,10 @@ class _AccessibilityPageState extends State<AccessibilityPage> {
                         const SizedBox(width: 10),
                         Expanded(
                           child: GradientButton(
-                            label: _busy ? '...' : 'Güvenli Arama',
+                            label: 'Güvenli Arama',
                             icon: Icons.call_rounded,
                             gradient: primaryGradient,
-                            onPressed: _busy ? () {} : _startSafeCall,
+                            onPressed: _openSafeCallPage,
                             height: 52,
                           ),
                         ),
@@ -212,7 +229,9 @@ class _AccessibilityPageState extends State<AccessibilityPage> {
                   ],
                 ),
               ),
+
               const SizedBox(height: 14),
+
               _sectionCard(
                 title: 'Erişilebilirlik Özellikleri',
                 icon: Icons.accessibility_new_rounded,
@@ -222,35 +241,35 @@ class _AccessibilityPageState extends State<AccessibilityPage> {
                     _FeatureTile(
                       icon: Icons.menu_book_rounded,
                       title: 'Sesli Betimlemeli Okuma',
-                      desc: 'Metin okuma prototipi (gerçek TTS yok).',
+                      desc: 'Metni sesli okuma özelliği.',
                       badge: 'Prototype',
                     ),
                     Divider(height: 18, color: YanYanaColors.divider),
                     _FeatureTile(
                       icon: Icons.mic_rounded,
                       title: 'Sesli Komut Sistemi',
-                      desc: 'Kısa komutlarla gezinme (planlanan).',
-                      badge: 'Future Integration',
+                      desc: 'Kullanıcı komutlarını algılayan sesli kontrol sistemi.',
+                      badge: 'MVP',
                     ),
                     Divider(height: 18, color: YanYanaColors.divider),
                     _FeatureTile(
                       icon: Icons.closed_caption_rounded,
                       title: 'Canlı Altyazı Desteği',
-                      desc: 'Prototip akışı (gerçek canlı altyazı yok).',
+                      desc: 'Konuşmaları gerçek zamanlı altyazıya dönüştürür.',
                       badge: 'Prototype',
                     ),
                     Divider(height: 18, color: YanYanaColors.divider),
                     _FeatureTile(
                       icon: Icons.vibration_rounded,
                       title: 'Titreşimli Geri Bildirim',
-                      desc: 'UI geri bildirimi (mock).',
+                      desc: 'Shake for Help ve hızlı yardım bildirimi.',
                       badge: 'MVP',
                     ),
                     Divider(height: 18, color: YanYanaColors.divider),
                     _FeatureTile(
                       icon: Icons.notifications_active_rounded,
                       title: 'Push Notification Prototype',
-                      desc: 'Bildirim gönderimi mock servisi ile simüle edilir.',
+                      desc: 'Bildirim gönderimini demo olarak simüle eder.',
                       badge: 'Prototype',
                     ),
                   ],
@@ -258,6 +277,7 @@ class _AccessibilityPageState extends State<AccessibilityPage> {
               ),
               if (_orchestrator.isAdmin) ...[
               const SizedBox(height: 14),
+
               SizedBox(
                 width: double.infinity,
                 child: OutlinedButton.icon(
@@ -353,9 +373,35 @@ class _FeatureTile extends StatelessWidget {
     required this.badge,
   });
 
+  void _navigate(BuildContext context) {
+    Widget? page;
+
+    if (title == 'Sesli Betimlemeli Okuma') {
+      page = const AudioDescriptionPage();
+    } else if (title == 'Sesli Komut Sistemi') {
+      page = const VoiceCommandPage();
+    } else if (title == 'Canlı Altyazı Desteği') {
+      page = const LiveCaptionPage();
+    } else if (title == 'Titreşimli Geri Bildirim') {
+      page = const ShakeHelpPage();
+    } else if (title == 'Push Notification Prototype') {
+      page = const PushNotificationPage();
+    }
+
+    if (page != null) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => page!,
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     Color badgeColor;
+
     switch (badge) {
       case 'MVP':
         badgeColor = YanYanaColors.success;
@@ -367,92 +413,78 @@ class _FeatureTile extends StatelessWidget {
         badgeColor = YanYanaColors.accentBlue;
     }
 
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          width: 42,
-          height: 42,
-          decoration: BoxDecoration(
-            color: badgeColor.withOpacity(0.12),
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Icon(icon, color: badgeColor, size: 22),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
+    return InkWell(
+      borderRadius: BorderRadius.circular(16),
+      onTap: () => _navigate(context),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(
+                color: badgeColor.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Icon(icon, color: badgeColor, size: 22),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
-                    child: Text(
-                      title,
-                      style: const TextStyle(
-                        color: YanYanaColors.textDark,
-                        fontWeight: FontWeight.w900,
-                        fontSize: 14.5,
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          title,
+                          style: const TextStyle(
+                            color: YanYanaColors.textDark,
+                            fontWeight: FontWeight.w900,
+                            fontSize: 14.5,
+                          ),
+                        ),
                       ),
-                    ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 5,
+                        ),
+                        decoration: BoxDecoration(
+                          color: badgeColor.withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                            color: badgeColor.withOpacity(0.18),
+                          ),
+                        ),
+                        child: Text(
+                          badge,
+                          style: const TextStyle(
+                            color: YanYanaColors.textDark,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 11,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                    decoration: BoxDecoration(
-                      color: badgeColor.withOpacity(0.12),
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: badgeColor.withOpacity(0.18)),
-                    ),
-                    child: Text(
-                      badge,
-                      style: const TextStyle(
-                        color: YanYanaColors.textDark,
-                        fontWeight: FontWeight.w800,
-                        fontSize: 11,
-                      ),
+                  const SizedBox(height: 5),
+                  Text(
+                    desc,
+                    style: const TextStyle(
+                      color: YanYanaColors.textMuted,
+                      fontSize: 12.5,
+                      height: 1.35,
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 5),
-              Text(
-                desc,
-                style: const TextStyle(
-                  color: YanYanaColors.textMuted,
-                  fontSize: 12.5,
-                  height: 1.35,
-                ),
-              ),
-              if (title == 'Sesli Betimlemeli Okuma') ...[
-                const SizedBox(height: 8),
-                OutlinedButton.icon(
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Sesli okuma prototip olarak simüle edildi.'),
-                      ),
-                    );
-                  },
-                  icon: const Icon(Icons.volume_up_rounded),
-                  label: const Text(
-                    'Metni Oku',
-                    style: TextStyle(fontWeight: FontWeight.w900),
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: YanYanaColors.primary,
-                    side: const BorderSide(color: YanYanaColors.border),
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                  ),
-                ),
-              ],
-            ],
-          ),
+            ),
+          ],
         ),
-      ],
+      ),
     );
   }
 }
-
