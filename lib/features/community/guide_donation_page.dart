@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:yanyana_p/core/theme/theme.dart';
 import 'package:yanyana_p/shared/data/mock_data.dart';
-
+import 'package:yanyana_p/features/guide/screens/guide_home_screen.dart';
+import 'package:yanyana_p/features/donation/screens/donation_home_screen.dart';
 class GuideDonationPage extends StatefulWidget {
   const GuideDonationPage({super.key});
 
@@ -82,8 +83,8 @@ class _GuideDonationPageState extends State<GuideDonationPage> {
               Expanded(
                 child: TabBarView(
                   children: [
-                    _buildGuideTab(),
-                    _buildDonationTab(),
+                    const GuideHomeScreen(),
+                    const DonationHomeScreen(),
                   ],
                 ),
               ),
@@ -208,7 +209,7 @@ class _GuideDonationPageState extends State<GuideDonationPage> {
           ),
           const SizedBox(height: 14),
           _sectionCard(
-            title: 'Bağış/Destek Formu (Mock)',
+            title: 'Destek niyeti formu',
             icon: Icons.edit_note_rounded,
             color: YanYanaColors.primary,
             child: Column(
@@ -269,7 +270,10 @@ class _GuideDonationPageState extends State<GuideDonationPage> {
                     onPressed: () {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
-                          content: Text('Bağış/destek talebiniz prototip olarak kaydedildi.'),
+                          content: Text(
+                            'Teşekkürler. Gerçek ödeme işlemi yapılmadı; '
+                            'niyetiniz yalnızca bu cihazda not olarak kaydedildi.',
+                          ),
                         ),
                       );
                       _noteCtrl.clear();

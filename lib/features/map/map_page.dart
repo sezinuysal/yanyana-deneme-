@@ -1,744 +1,1072 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
-import 'package:yanyana_p/core/services/database_bridge.dart';
-import 'package:yanyana_p/core/theme/theme.dart';
-import 'package:yanyana_p/shared/models/accessibility_review.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
+import 'package:yanyana_p/core/services/backend_orchestrator.dart';
+import 'package:yanyana_p/core/services/geocoding_service.dart';
+import 'package:yanyana_p/core/services/location_service.dart';
+import 'package:yanyana_p/core/services/place_service.dart';
+import 'package:yanyana_p/core/theme/app_theme.dart';
+import 'package:yanyana_p/core/utils/feature_dialogs.dart';
+import 'package:yanyana_p/features/map/widgets/place_details_sheet.dart';
+import 'package:yanyana_p/features/map/widgets/place_form_dialog.dart';
+import 'package:yanyana_p/features/map/widgets/emergency_map_marker.dart';
+import 'package:yanyana_p/features/map/widgets/emergency_request_sheet.dart';
+import 'package:yanyana_p/features/map/widgets/map_compact_fab.dart';
+import 'package:yanyana_p/features/map/widgets/map_filter_sheet.dart';
+import 'package:yanyana_p/features/map/widgets/place_list_panel.dart';
 import 'package:yanyana_p/shared/models/accessible_place.dart';
+import 'package:yanyana_p/shared/models/emergency_request.dart';
 
 class MapPage extends StatefulWidget {
   const MapPage({super.key});
 
   @override
-  State<MapPage> createState() => _MapPageState();
+  State<MapPage> createState() => MapPageState();
 }
 
-class _MapPageState extends State<MapPage> {
-  static const double _demoLat = 39.9208; // Ankara (demo coordinate)
-  static const double _demoLon = 32.8541;
+class MapPageState extends State<MapPage> {
+  final _mapController = MapController();
+  final _placesSheetKey = GlobalKey<_SavedPlacesSheetState>();
+  final _sheetExtent = ValueNotifier<double>(0.14);
+  final _backend = BackendOrchestrator.instance;
+  final _placeService = PlaceService.instance;
+  final _locationService = const LocationService();
+  final _geocodingService = const GeocodingService();
+  final _searchCtrl = TextEditingController();
 
-  final _db = const DatabaseBridge();
+  StreamSubscription<List<AccessiblePlace>>? _placesSub;
+  StreamSubscription<List<EmergencyRequest>>? _sosSub;
 
-  String _selectedFilter = 'Tümü';
-
-  final List<String> _filters = [
-    'Tümü',
-    'Kafe',
-    'Restoran',
-    'Park',
-    'Hastane',
-  ];
-
+  List<AccessiblePlace> _allPlaces = [];
+  List<EmergencyRequest> _emergencyRequests = [];
   bool _loading = true;
-  List<AccessiblePlace> _places = const [];
+  bool _mapReady = false;
+  String? _mapError;
+  LatLng? _userLocation;
+
+  String _searchQuery = '';
+  String _categoryFilter = 'Tümü';
+  final Set<String> _accessibilityFilters = {};
+  PlaceListSort _listSort = PlaceListSort.name;
+  String? _selectedPlaceId;
+  bool _searchingLocation = false;
+
+  static const _accessFilterOptions = <MapEntry<String, String>>[
+    MapEntry('wheelchair', 'Tekerlekli sandalye'),
+    MapEntry('restroom', 'Tuvalet'),
+    MapEntry('elevator', 'Asansör'),
+    MapEntry('ramp', 'Rampa'),
+    MapEntry('hearing', 'İşitme'),
+    MapEntry('visual', 'Görsel'),
+  ];
 
   @override
   void initState() {
     super.initState();
-    _loadPlaces();
+    _subscribeStreams();
   }
 
-  Future<void> _loadPlaces() async {
-    setState(() => _loading = true);
-    final list = await _db.getNearbyPlaces(
-      latitude: _demoLat,
-      longitude: _demoLon,
-      radiusMeters: 1500,
+  void _subscribeStreams({bool showLoadingOverlay = true}) {
+    _placesSub?.cancel();
+    _sosSub?.cancel();
+    if (showLoadingOverlay && _allPlaces.isEmpty) {
+      setState(() => _loading = true);
+    }
+    _placesSub = _backend.streamAccessiblePlaces().listen(
+      (places) {
+        if (!mounted) return;
+        setState(() {
+          _allPlaces = places;
+          _loading = false;
+        });
+      },
+      onError: (e) {
+        if (!mounted) return;
+        setState(() {
+          _loading = false;
+          _mapError = 'Mekanlar yüklenemedi: $e';
+        });
+      },
     );
-    if (!mounted) return;
-    setState(() {
-      _places = list;
-      _loading = false;
+    _sosSub = _backend.streamMapEmergencyRequests().listen(
+      (requests) {
+        if (!mounted) return;
+        setState(() => _emergencyRequests = requests);
+      },
+    );
+  }
+
+  /// Call when the map tab becomes visible (e.g. after SOS from Home).
+  void refreshEmergencyMarkers() {
+    _sosSub?.cancel();
+    _sosSub = _backend.streamMapEmergencyRequests().listen(
+      (requests) {
+        if (!mounted) return;
+        setState(() => _emergencyRequests = requests);
+      },
+    );
+  }
+
+  @override
+  void dispose() {
+    _placesSub?.cancel();
+    _sosSub?.cancel();
+    _searchCtrl.dispose();
+    _sheetExtent.dispose();
+    super.dispose();
+  }
+
+  AccessiblePlace? _placeById(String id) {
+    try {
+      return _allPlaces.firstWhere((p) => p.id == id);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  void _openSavedPlacesPanel() {
+    _placesSheetKey.currentState?.expand();
+  }
+
+  void _selectPlace(AccessiblePlace place) {
+    _focusPlaceOnMap(place);
+    Future<void>.delayed(const Duration(milliseconds: 320), () {
+      if (!mounted) return;
+      final current = _placeById(place.id) ?? place;
+      _openPlaceDetails(current);
     });
   }
 
-  List<AccessiblePlace> get _filteredPlaces {
-    if (_selectedFilter == 'Tümü') return _places;
-    return _places.where((p) => p.category == _selectedFilter).toList();
+  List<AccessiblePlace> get _filteredPlaces => _placeService.filterPlaces(
+        places: _allPlaces,
+        searchQuery: _searchQuery,
+        categoryFilter: _categoryFilter,
+        accessibilityFilters: _accessibilityFilters,
+      );
+
+  Future<void> _reloadPlaces() async {
+    try {
+      final places = await _placeService.getPlaces();
+      if (!mounted) return;
+      setState(() => _allPlaces = places);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _mapError = 'Mekanlar yüklenemedi: $e');
+    }
+  }
+
+  LatLng _mapCenter() {
+    try {
+      return _mapController.camera.center;
+    } catch (_) {
+      return LocationService.defaultCenter;
+    }
+  }
+
+  Future<void> _showMyLocation() async {
+    try {
+      final pos = await _locationService.getCurrentPosition();
+      if (!mounted) return;
+      setState(() => _userLocation = pos);
+      _mapController.move(pos, 15);
+    } on LocationFailure catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.message),
+          action: SnackBarAction(
+            label: 'Tamam',
+            onPressed: () {},
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Konum alınamadı: $e')),
+      );
+    }
+  }
+
+  Future<void> _openAddPlace() async {
+    final center = _mapCenter();
+    final result = await showPlaceFormDialog(
+      context: context,
+      latitude: center.latitude,
+      longitude: center.longitude,
+    );
+    if (result == null || !mounted) return;
+    try {
+      final added = await _backend.addAccessiblePlace(
+        name: result.name,
+        category: result.category,
+        latitude: result.latitude,
+        longitude: result.longitude,
+        description: result.description,
+        rating: result.rating,
+        wheelchairAccessible: result.wheelchairAccessible,
+        hasAccessibleToilet: result.hasAccessibleToilet,
+        hasElevator: result.hasElevator,
+        hasRamp: result.hasRamp,
+        hearingSupport: result.hearingSupport,
+        visualSupport: result.visualSupport,
+      );
+      await _reloadPlaces();
+      if (!mounted) return;
+      final place = _placeById(added.id) ?? added;
+      _selectPlace(place);
+      _openSavedPlacesPanel();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Kayıt başarısız: $e')),
+      );
+    }
+  }
+
+  Future<void> _openEditPlace(AccessiblePlace place) async {
+    final result = await showPlaceFormDialog(
+      context: context,
+      latitude: place.latitude,
+      longitude: place.longitude,
+      existing: place,
+    );
+    if (result == null || !mounted) return;
+    try {
+      final updated = place.copyWith(
+        name: result.name,
+        category: result.category,
+        description: result.description,
+        rating: result.rating,
+        wheelchairAccessible: result.wheelchairAccessible,
+        hasAccessibleToilet: result.hasAccessibleToilet,
+        hasElevator: result.hasElevator,
+        hasRamp: result.hasRamp,
+        hearingSupport: result.hearingSupport,
+        visualSupport: result.visualSupport,
+      );
+      await _backend.updateAccessiblePlace(updated);
+      await _reloadPlaces();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Mekan güncellendi.')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Güncelleme başarısız: $e')),
+      );
+    }
+  }
+
+  void _focusPlaceOnMap(AccessiblePlace place) {
+    setState(() => _selectedPlaceId = place.id);
+    _mapController.move(LatLng(place.latitude, place.longitude), 16);
+  }
+
+  Future<void> _searchLocation() async {
+    final query = _searchCtrl.text.trim();
+    if (query.isEmpty) return;
+
+    FocusScope.of(context).unfocus();
+    setState(() => _searchingLocation = true);
+
+    try {
+      final results = await _geocodingService.searchLocations(query);
+      if (!mounted) return;
+      setState(() => _searchingLocation = false);
+
+      if (results.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('"$query" için konum bulunamadı.')),
+        );
+        return;
+      }
+
+      if (results.length == 1) {
+        _goToGeocodingResult(results.first);
+        return;
+      }
+
+      final picked = await showModalBottomSheet<GeocodingResult>(
+        context: context,
+        backgroundColor: YanYanaColors.surface,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        builder: (ctx) {
+          return SafeArea(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(16, 12, 16, 8),
+                  child: Text(
+                    'Konum seçin',
+                    style: TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxHeight: MediaQuery.sizeOf(ctx).height * 0.45,
+                  ),
+                  child: ListView.separated(
+                    shrinkWrap: true,
+                    itemCount: results.length,
+                    separatorBuilder: (_, __) => const Divider(height: 1),
+                    itemBuilder: (context, index) {
+                      final r = results[index];
+                      return ListTile(
+                        leading: const Icon(Icons.place_outlined),
+                        title: Text(
+                          r.displayName,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontSize: 14),
+                        ),
+                        subtitle: r.kind.isNotEmpty
+                            ? Text(r.kind, style: const TextStyle(fontSize: 12))
+                            : null,
+                        onTap: () => Navigator.pop(ctx, r),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      );
+
+      if (picked != null && mounted) {
+        _goToGeocodingResult(picked);
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _searchingLocation = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Konum aranamadı: $e')),
+      );
+    }
+  }
+
+  void _goToGeocodingResult(GeocodingResult result) {
+    final zoom = result.kind.contains('suburb') ||
+            result.kind.contains('neighbourhood') ||
+            result.kind.contains('quarter')
+        ? 14.0
+        : result.kind.contains('city') || result.kind.contains('town')
+            ? 12.0
+            : 13.5;
+    _mapController.move(result.latLng, zoom);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          result.displayName.split(',').first.trim(),
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+        ),
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 3),
+      ),
+    );
+  }
+
+  Future<void> _openPlaceDetails(AccessiblePlace place) async {
+    final reviews = await _backend.fetchPlaceReviews(place.id);
+    if (!mounted) return;
+    showPlaceDetailsSheet(
+      context: context,
+      place: place,
+      reviews: reviews,
+      onEdit: () => _openEditPlace(place),
+      onDelete: () async {
+        await _backend.deleteAccessiblePlace(place.id);
+        await _reloadPlaces();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Mekan silindi.')),
+          );
+        }
+      },
+      onAddReview: (comment, rating) async {
+        await _backend.addPlaceReview(
+          placeId: place.id,
+          comment: comment,
+          rating: rating,
+          placeSnapshot: place,
+        );
+        await _reloadPlaces();
+      },
+    );
+  }
+
+  Future<void> _triggerSos() async {
+    LatLng? loc;
+    try {
+      loc = await _locationService.getCurrentPosition();
+    } on LocationFailure {
+      loc = _userLocation;
+    } catch (_) {
+      loc = _userLocation;
+    }
+
+    if (!mounted) return;
+
+    if (loc == null) {
+      final proceed = await showDialog<bool>(
+        context: context,
+        builder: (c) => AlertDialog(
+          title: const Text('Konum yok'),
+          content: const Text(
+            'GPS konumu alınamadı. Acil isteği konum olmadan oluşturmak istiyor musunuz? '
+            'Gerçek acil servis aranmayacaktır; kayıt yalnızca yerelde tutulur.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(c, false),
+              child: const Text('İptal'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(c, true),
+              child: const Text('Devam et'),
+            ),
+          ],
+        ),
+      );
+      if (proceed != true) return;
+    } else {
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (c) => AlertDialog(
+          title: const Text('SOS onayı'),
+          content: Text(
+            'Acil destek isteği oluşturulsun mu?\n'
+            'Konum: ${loc!.latitude.toStringAsFixed(5)}, ${loc.longitude.toStringAsFixed(5)}\n\n'
+            'Gerçek arama/SMS gönderilmez. Güvenilir kişinize bildirim entegrasyonu sonraki sürümde.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(c, false),
+              child: const Text('İptal'),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(backgroundColor: YanYanaColors.sos),
+              onPressed: () => Navigator.pop(c, true),
+              child: const Text('SOS Oluştur'),
+            ),
+          ],
+        ),
+      );
+      if (ok != true) return;
+    }
+
+    try {
+      final req = await _backend.triggerSOS(
+        latitude: loc?.latitude,
+        longitude: loc?.longitude,
+      );
+      if (!mounted) return;
+      final point = req.latLng;
+      if (point != null) {
+        _mapController.move(point, 15);
+      }
+      if (!mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (c) => AlertDialog(
+          title: const Text('Acil istek oluşturuldu'),
+          content: Text(
+            'Durum: ${req.statusLabel}\n'
+            '${req.location != null ? 'Konum haritada işaretlendi.\n' : 'Konum olmadan kaydedildi.\n'}'
+            'Bu yalnızca yerel MVP kaydıdır; gerçek arama/SMS gönderilmez.',
+          ),
+          actions: [
+            FilledButton(
+              onPressed: () => Navigator.pop(c),
+              child: const Text('Tamam'),
+            ),
+          ],
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString())),
+      );
+    }
+  }
+
+  void _openFilterSheet() {
+    showMapFilterSheet(
+      context: context,
+      initialCategory: _categoryFilter,
+      initialAccessibilityFilters: _accessibilityFilters,
+      accessFilterOptions: _accessFilterOptions,
+      onApply: (category, filters) {
+        setState(() {
+          _categoryFilter = category;
+          _accessibilityFilters
+            ..clear()
+            ..addAll(filters);
+        });
+      },
+    );
+  }
+
+  double _listBottomPadding(BuildContext context) {
+    // Map tab body sits above MainPage bottom nav; only safe-area inset needed.
+    return MediaQuery.paddingOf(context).bottom + 12;
+  }
+
+  void _openEmergencyDetails(EmergencyRequest request) {
+    showEmergencyRequestSheet(
+      context: context,
+      request: request,
+      onDismiss: () async {
+        await _backend.dismissMapEmergencyRequest(
+          request.id,
+        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Acil işaret haritadan kaldırıldı.'),
+            ),
+          );
+        }
+      },
+    );
+  }
+
+  List<Marker> _buildEmergencyMarkers() {
+    return _emergencyRequests
+        .where((r) => r.latLng != null)
+        .map(
+          (r) => Marker(
+            point: r.latLng!,
+            width: 130,
+            height: 95,
+            alignment: Alignment.topCenter,
+            child: EmergencyMapMarker(
+              request: r,
+              onTap: () => _openEmergencyDetails(r),
+            ),
+          ),
+        )
+        .toList();
+  }
+
+  List<Marker> _buildMarkers(List<AccessiblePlace> places) {
+    return places
+        .map(
+          (p) => Marker(
+            point: LatLng(p.latitude, p.longitude),
+            width: 44,
+            height: 44,
+            child: GestureDetector(
+              onTap: () => _selectPlace(p),
+              child: Icon(
+                Icons.location_on_rounded,
+                size: 44,
+                color: p.color,
+                semanticLabel: p.name,
+              ),
+            ),
+          ),
+        )
+        .toList();
   }
 
   @override
   Widget build(BuildContext context) {
+    final filtered = _filteredPlaces;
+    final sortedList = sortPlacesForList(filtered, _listSort);
+    final listBottomPad = _listBottomPadding(context);
+    final hasPlaces = _allPlaces.isNotEmpty;
+
     return Scaffold(
       backgroundColor: YanYanaColors.background,
-      body: SafeArea(
-        child: Column(
-          children: [
-            _buildHeader(),
-            _buildMapPreview(),
-            _buildFilterChips(),
-            Expanded(child: _buildPlaceList()),
-          ],
-        ),
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {},
-        backgroundColor: YanYanaColors.primary,
-        foregroundColor: Colors.white,
-        icon: const Icon(Icons.add_location_alt_rounded),
-        label: const Text(
-          'Mekan Ekle',
-          style: TextStyle(fontWeight: FontWeight.w800),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildHeader() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Erişilebilir Mekanlar',
-            style: TextStyle(
-              color: YanYanaColors.textDark,
-              fontSize: 23,
-              fontWeight: FontWeight.w900,
-              letterSpacing: -0.5,
-            ),
+      appBar: AppBar(
+        toolbarHeight: 52,
+        centerTitle: false,
+        title: const Text(
+          'Erişilebilir Harita',
+          style: TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.w600,
+            color: YanYanaColors.textDark,
           ),
-          const SizedBox(height: 5),
-          const Text(
-            'Yakınındaki erişilebilir alanları keşfet ve puanla.',
-            style: TextStyle(
-              color: YanYanaColors.textMuted,
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          const SizedBox(height: 16),
-          Container(
-            height: 50,
-            decoration: BoxDecoration(
-              color: YanYanaColors.surface,
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: YanYanaColors.border),
-              boxShadow: YanYanaShadows.soft,
-            ),
-            child: const TextField(
-              decoration: InputDecoration(
-                hintText: 'Mekan ara...',
-                hintStyle: TextStyle(
-                  color: YanYanaColors.textLight,
-                  fontSize: 14,
-                ),
-                prefixIcon: Icon(
-                  Icons.search_rounded,
-                  color: YanYanaColors.primary,
-                  size: 22,
-                ),
-                border: InputBorder.none,
-                contentPadding: EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 14,
-                ),
+        ),
+        backgroundColor: YanYanaColors.surface,
+        foregroundColor: YanYanaColors.textDark,
+        elevation: 0,
+        scrolledUnderElevation: 0.5,
+        actions: [
+          Semantics(
+            label: 'Erişilebilir rota, gelecek özellik',
+            button: true,
+            child: IconButton(
+              tooltip: 'Erişilebilir rota (gelecek)',
+              icon: const Icon(Icons.directions_walk_outlined, size: 24),
+              onPressed: () => showFutureFeatureDialog(
+                context,
+                title: 'Erişilebilir rota',
+                message:
+                    'Gelişmiş rota erişilebilirlik analizi gelecek sürümde eklenecek.',
               ),
             ),
           ),
+          const SizedBox(width: 4),
         ],
       ),
-    );
-  }
-
-  Widget _buildMapPreview() {
-    return Container(
-      height: 145,
-      margin: const EdgeInsets.fromLTRB(20, 4, 20, 16),
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        gradient: calmGradient,
-        borderRadius: BorderRadius.circular(26),
-        boxShadow: YanYanaShadows.card,
-      ),
-      child: Stack(
-        children: [
-          Positioned(
-            right: 8,
-            top: 8,
-            child: Icon(
-              Icons.map_rounded,
-              size: 90,
-              color: YanYanaColors.primary.withOpacity(0.18),
-            ),
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final mapHeight = constraints.maxHeight;
+          return Stack(
+            clipBehavior: Clip.none,
             children: [
-              const Icon(
-                Icons.location_searching_rounded,
-                color: YanYanaColors.primary,
-                size: 28,
+              Positioned.fill(
+                child: FlutterMap(
+            mapController: _mapController,
+            options: MapOptions(
+              initialCenter: LocationService.defaultCenter,
+              initialZoom: 13,
+              onMapReady: () => setState(() => _mapReady = true),
+            ),
+            children: [
+              TileLayer(
+                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                userAgentPackageName: 'com.example.yanyana_p',
+                errorTileCallback: (tile, error, stackTrace) {
+                  if (_mapError == null && mounted) {
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      if (mounted) {
+                        setState(() {
+                          _mapError =
+                              'Harita karoları yüklenemedi. İnternet bağlantınızı kontrol edin.';
+                        });
+                      }
+                    });
+                  }
+                },
               ),
-              const SizedBox(height: 14),
-              const Text(
-                'Harita Önizlemesi',
-                style: TextStyle(
-                  color: YanYanaColors.textDark,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w900,
+              if (_userLocation != null)
+                MarkerLayer(
+                  markers: [
+                    Marker(
+                      point: _userLocation!,
+                      width: 28,
+                      height: 28,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: YanYanaColors.accentBlue.withOpacity(0.3),
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: YanYanaColors.accentBlue,
+                            width: 3,
+                          ),
+                        ),
+                        child: const Icon(
+                          Icons.person_pin_circle,
+                          color: YanYanaColors.primary,
+                          size: 20,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              MarkerLayer(markers: _buildMarkers(filtered)),
+              if (_emergencyRequests.isNotEmpty)
+                MarkerLayer(markers: _buildEmergencyMarkers()),
+            ],
                 ),
               ),
-              const SizedBox(height: 5),
-              const Text(
-                'Gerçek harita entegrasyonu için Google Maps veya OpenStreetMap eklenebilir.',
-                style: TextStyle(
-                  color: YanYanaColors.textMuted,
-                  fontSize: 12.5,
-                  height: 1.35,
+              if (!_mapReady || _loading)
+                Positioned.fill(
+                  child: Container(
+                    color: YanYanaColors.background.withOpacity(0.85),
+                    child: const Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          CircularProgressIndicator(),
+                          SizedBox(height: 12),
+                          Text(
+                            'Harita yükleniyor…',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w500,
+                              color: YanYanaColors.textMuted,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              if (_mapError != null)
+                Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: Material(
+                color: YanYanaColors.warning.withOpacity(0.95),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.wifi_off_rounded, color: Colors.white),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          _mapError!,
+                          style: const TextStyle(color: Colors.white),
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close, color: Colors.white),
+                        onPressed: () => setState(() => _mapError = null),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-              const SizedBox(height: 6),
-              Text(
-                'Mekan verileri OpenStreetMap / Overpass API entegrasyonuna hazır yapıdadır. Bu prototipte veriler yerel mock servis üzerinden gösterilmektedir.',
-                style: TextStyle(
-                  color: YanYanaColors.textMuted.withOpacity(0.9),
-                  fontSize: 11.5,
-                  height: 1.25,
-                  fontWeight: FontWeight.w600,
                 ),
+              Positioned(
+                top: 6,
+                left: 12,
+                right: 12,
+            child: Column(
+              children: [
+                Material(
+                  elevation: 1,
+                  shadowColor: Colors.black12,
+                  borderRadius: BorderRadius.circular(14),
+                  child: TextField(
+                    controller: _searchCtrl,
+                    textInputAction: TextInputAction.search,
+                    onSubmitted: (_) => _searchLocation(),
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w400,
+                    ),
+                    decoration: InputDecoration(
+                      hintText: 'Mekan veya semt ara…',
+                      hintStyle: TextStyle(
+                        color: YanYanaColors.textMuted.withOpacity(0.85),
+                        fontSize: 15,
+                        fontWeight: FontWeight.w400,
+                      ),
+                      isDense: true,
+                      contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                      prefixIcon: Icon(
+                        Icons.search_rounded,
+                        color: YanYanaColors.textMuted.withOpacity(0.8),
+                      ),
+                      suffixIcon: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (_searchingLocation)
+                            const Padding(
+                              padding: EdgeInsets.all(12),
+                              child: SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              ),
+                            )
+                          else
+                            IconButton(
+                              tooltip: 'Semt veya konum ara',
+                              icon: const Icon(Icons.travel_explore_rounded, size: 22),
+                              onPressed: _searchLocation,
+                            ),
+                          if (_searchQuery.isNotEmpty)
+                            IconButton(
+                              icon: const Icon(Icons.clear_rounded, size: 20),
+                              onPressed: () {
+                                _searchCtrl.clear();
+                                setState(() => _searchQuery = '');
+                              },
+                            ),
+                        ],
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: const BorderSide(color: YanYanaColors.border),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: const BorderSide(color: YanYanaColors.border),
+                      ),
+                      filled: true,
+                      fillColor: YanYanaColors.surface,
+                    ),
+                    onChanged: (v) => setState(() => _searchQuery = v),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Semantics(
+                        label: 'Kayıtlı mekanlar listesi',
+                        button: true,
+                        child: Material(
+                          elevation: 1,
+                          borderRadius: BorderRadius.circular(12),
+                          color: YanYanaColors.primary.withOpacity(0.92),
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(12),
+                            onTap: _openSavedPlacesPanel,
+                            child: SizedBox(
+                              height: 44,
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  const Icon(
+                                    Icons.bookmark_rounded,
+                                    size: 18,
+                                    color: Colors.white,
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Flexible(
+                                    child: Text(
+                                      'Kayıtlı (${sortedList.length})',
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w600,
+                                        color: Colors.white,
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Semantics(
+                        label: 'Harita filtreleri',
+                        button: true,
+                        child: Material(
+                          elevation: 1,
+                          borderRadius: BorderRadius.circular(12),
+                          color: YanYanaColors.surface,
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(12),
+                            onTap: _openFilterSheet,
+                            child: SizedBox(
+                              height: 44,
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.tune_rounded,
+                                    size: 18,
+                                    color: _categoryFilter != 'Tümü' ||
+                                            _accessibilityFilters.isNotEmpty
+                                        ? YanYanaColors.primary
+                                        : YanYanaColors.textMuted,
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Flexible(
+                                    child: Text(
+                                      _categoryFilter != 'Tümü' ||
+                                              _accessibilityFilters.isNotEmpty
+                                          ? 'Filtre · Aktif'
+                                          : 'Filtre',
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 14,
+                                        color: _categoryFilter != 'Tümü' ||
+                                                _accessibilityFilters.isNotEmpty
+                                            ? YanYanaColors.primary
+                                            : YanYanaColors.textDark,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+                ),
+              ),
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                height: mapHeight,
+                child: _SavedPlacesSheet(
+                  key: _placesSheetKey,
+                  mapHeight: mapHeight,
+                  hasPlaces: hasPlaces,
+                  sheetExtent: _sheetExtent,
+                  places: sortedList,
+                  sort: _listSort,
+                  bottomPadding: listBottomPad,
+                  selectedPlaceId: _selectedPlaceId,
+                  onAddPlace: _openAddPlace,
+                  onSortChanged: (s) => setState(() => _listSort = s),
+                  onPlaceSelected: _selectPlace,
+                ),
+              ),
+              ValueListenableBuilder<double>(
+                valueListenable: _sheetExtent,
+                builder: (context, fraction, _) {
+                  final fabBottom =
+                      (mapHeight * fraction + 16).clamp(72.0, mapHeight - 160);
+                  return Positioned(
+                    right: 12,
+                    bottom: fabBottom,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        MapCompactFab(
+                          label: 'SOS',
+                          icon: Icons.emergency_rounded,
+                          color: const Color(0xFFDC4C4C),
+                          semanticLabel: 'Acil SOS isteği oluştur',
+                          onPressed: _triggerSos,
+                        ),
+                        const SizedBox(height: 8),
+                        MapCompactFab(
+                          label: 'Ekle',
+                          icon: Icons.add_location_alt_outlined,
+                          color: YanYanaColors.primary.withOpacity(0.95),
+                          semanticLabel: 'Erişilebilir mekan ekle',
+                          onPressed: _openAddPlace,
+                        ),
+                        const SizedBox(height: 8),
+                        MapCompactFab(
+                          label: 'Konum',
+                          icon: Icons.my_location_rounded,
+                          color: YanYanaColors.secondary.withOpacity(0.95),
+                          semanticLabel: 'Konumumu göster',
+                          onPressed: _showMyLocation,
+                        ),
+                      ],
+                    ),
+                  );
+                },
               ),
             ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildFilterChips() {
-    return SizedBox(
-      height: 42,
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        itemCount: _filters.length,
-        itemBuilder: (context, index) {
-          final filter = _filters[index];
-          final selected = _selectedFilter == filter;
-
-          return GestureDetector(
-            onTap: () => setState(() => _selectedFilter = filter),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 220),
-              margin: const EdgeInsets.only(right: 9),
-              padding: const EdgeInsets.symmetric(horizontal: 17, vertical: 9),
-              decoration: BoxDecoration(
-                color: selected ? YanYanaColors.primary : YanYanaColors.surface,
-                borderRadius: BorderRadius.circular(22),
-                border: Border.all(
-                  color: selected
-                      ? YanYanaColors.primary
-                      : YanYanaColors.border,
-                ),
-                boxShadow: selected ? YanYanaShadows.soft : null,
-              ),
-              child: Text(
-                filter,
-                style: TextStyle(
-                  color: selected ? Colors.white : YanYanaColors.textMuted,
-                  fontWeight: FontWeight.w800,
-                  fontSize: 13,
-                ),
-              ),
-            ),
           );
         },
       ),
     );
   }
-
-  Widget _buildPlaceList() {
-    if (_loading) {
-      return const Center(
-        child: CircularProgressIndicator(color: YanYanaColors.primary),
-      );
-    }
-
-    return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 95),
-      itemCount: _filteredPlaces.length,
-      itemBuilder: (context, index) {
-        final place = _filteredPlaces[index];
-        return _PlaceCard(
-          place: place,
-          onTap: () => _showPlaceDetail(place),
-        );
-      },
-    );
-  }
-
-  void _showPlaceDetail(AccessiblePlace place) {
-    final commentCtrl = TextEditingController();
-
-    bool wheelchairAccessible = place.wheelchairAccessible;
-    bool hasRamp = place.hasRamp;
-    bool hasElevator = place.hasElevator;
-    bool hasAccessibleToilet = place.hasAccessibleToilet;
-    bool hasQuietArea = place.hasQuietArea;
-    bool corridorWide = place.corridorWide;
-    double rating = place.rating > 0 ? place.rating : 0;
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) {
-        return Padding(
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.of(context).viewInsets.bottom,
-          ),
-          child: Container(
-            decoration: BoxDecoration(
-              color: YanYanaColors.surface,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-              boxShadow: YanYanaShadows.card,
-            ),
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 18),
-            child: StatefulBuilder(
-              builder: (context, setModalState) {
-                return SingleChildScrollView(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Container(
-                            width: 42,
-                            height: 42,
-                            decoration: BoxDecoration(
-                              color: place.color.withOpacity(0.12),
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            child: Icon(
-                              Icons.place_rounded,
-                              color: place.color,
-                              size: 22,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  place.name,
-                                  style: const TextStyle(
-                                    color: YanYanaColors.textDark,
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w900,
-                                  ),
-                                ),
-                                const SizedBox(height: 3),
-                                Text(
-                                  '${place.category} · ${place.distance} · ${place.userCommentCount} yorum',
-                                  style: const TextStyle(
-                                    color: YanYanaColors.textMuted,
-                                    fontSize: 12.5,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          IconButton(
-                            onPressed: () => Navigator.pop(context),
-                            icon: const Icon(Icons.close_rounded),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      Wrap(
-                        spacing: 7,
-                        runSpacing: 7,
-                        children: place.tags
-                            .map(
-                              (t) => Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 10,
-                                  vertical: 5,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: YanYanaColors.surfaceSoft,
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                child: Text(
-                                  t,
-                                  style: const TextStyle(
-                                    color: YanYanaColors.textMuted,
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                                ),
-                              ),
-                            )
-                            .toList(),
-                      ),
-                      const SizedBox(height: 14),
-                      const Divider(height: 1, color: YanYanaColors.divider),
-                      const SizedBox(height: 12),
-                      const Text(
-                        'Erişilebilirlik Kontrol Listesi (Prototip)',
-                        style: TextStyle(
-                          color: YanYanaColors.textDark,
-                          fontWeight: FontWeight.w900,
-                          fontSize: 14,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      _checkRow(
-                        label: 'Tekerlekli sandalye uygun',
-                        value: wheelchairAccessible,
-                        onChanged: (v) =>
-                            setModalState(() => wheelchairAccessible = v),
-                      ),
-                      _checkRow(
-                        label: 'Rampa',
-                        value: hasRamp,
-                        onChanged: (v) => setModalState(() => hasRamp = v),
-                      ),
-                      _checkRow(
-                        label: 'Asansör',
-                        value: hasElevator,
-                        onChanged: (v) => setModalState(() => hasElevator = v),
-                      ),
-                      _checkRow(
-                        label: 'Engelli tuvaleti',
-                        value: hasAccessibleToilet,
-                        onChanged: (v) =>
-                            setModalState(() => hasAccessibleToilet = v),
-                      ),
-                      _checkRow(
-                        label: 'Sessiz alan',
-                        value: hasQuietArea,
-                        onChanged: (v) => setModalState(() => hasQuietArea = v),
-                      ),
-                      _checkRow(
-                        label: 'Geniş koridor',
-                        value: corridorWide,
-                        onChanged: (v) => setModalState(() => corridorWide = v),
-                      ),
-                      const SizedBox(height: 10),
-                      Row(
-                        children: [
-                          const Text(
-                            'Puan:',
-                            style: TextStyle(
-                              color: YanYanaColors.textMuted,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          ...List.generate(
-                            5,
-                            (i) => GestureDetector(
-                              onTap: () => setModalState(() => rating = i + 1.0),
-                              child: Icon(
-                                i < rating
-                                    ? Icons.star_rounded
-                                    : Icons.star_outline_rounded,
-                                color: YanYanaColors.accentYellow,
-                                size: 26,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      TextField(
-                        controller: commentCtrl,
-                        minLines: 2,
-                        maxLines: 4,
-                        decoration: InputDecoration(
-                          labelText: 'Yorum',
-                          hintText: 'Deneyimini kısaca paylaş',
-                          filled: true,
-                          fillColor: YanYanaColors.surfaceSoft,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(18),
-                            borderSide:
-                                const BorderSide(color: YanYanaColors.border),
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(18),
-                            borderSide:
-                                const BorderSide(color: YanYanaColors.border),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 14),
-                      SizedBox(
-                        width: double.infinity,
-                        child: GradientButton(
-                          label: 'Değerlendirmeyi Gönder',
-                          icon: Icons.check_circle_rounded,
-                          gradient: supportGradient,
-                          onPressed: () async {
-                            final user = _db.getCurrentUser();
-                            final review = AccessibilityReview(
-                              id: 'rev_${DateTime.now().millisecondsSinceEpoch}',
-                              placeId: place.id,
-                              userId: user.id,
-                              wheelchairAccessible: wheelchairAccessible,
-                              hasRamp: hasRamp,
-                              hasElevator: hasElevator,
-                              hasAccessibleToilet: hasAccessibleToilet,
-                              hasQuietArea: hasQuietArea,
-                              corridorWide: corridorWide,
-                              rating: rating <= 0 ? 4.0 : rating,
-                              comment: commentCtrl.text.trim(),
-                              createdAt: DateTime.now(),
-                            );
-
-                            await _db.saveAccessibilityReview(review);
-                            if (!mounted) return;
-                            Navigator.pop(context);
-                            ScaffoldMessenger.of(this.context).showSnackBar(
-                              const SnackBar(
-                                content: Text(
-                                  'Erişilebilirlik değerlendirmesi prototip olarak kaydedildi.',
-                                ),
-                              ),
-                            );
-                            await _loadPlaces();
-                          },
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Veri Kaynağı: ${place.source} (future: Overpass API) · YanYana değerlendirmeleri: yerel mock',
-                        style: const TextStyle(
-                          color: YanYanaColors.textLight,
-                          fontSize: 11.5,
-                          height: 1.25,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              },
-            ),
-          ),
-        );
-      },
-    ).whenComplete(commentCtrl.dispose);
-  }
-
-  static Widget _checkRow({
-    required String label,
-    required bool value,
-    required ValueChanged<bool> onChanged,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              label,
-              style: const TextStyle(
-                color: YanYanaColors.textMuted,
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-          Switch(
-            value: value,
-            onChanged: onChanged,
-            activeColor: YanYanaColors.primary,
-          ),
-        ],
-      ),
-    );
-  }
 }
 
-class _PlaceCard extends StatefulWidget {
-  final AccessiblePlace place;
-  final VoidCallback onTap;
+/// Owns [DraggableScrollableController] so parent [setState] does not re-attach it.
+class _SavedPlacesSheet extends StatefulWidget {
+  const _SavedPlacesSheet({
+    super.key,
+    required this.mapHeight,
+    required this.hasPlaces,
+    required this.sheetExtent,
+    required this.places,
+    required this.sort,
+    required this.bottomPadding,
+    required this.selectedPlaceId,
+    required this.onAddPlace,
+    required this.onSortChanged,
+    required this.onPlaceSelected,
+  });
 
-  const _PlaceCard({required this.place, required this.onTap});
+  final double mapHeight;
+  final bool hasPlaces;
+  final ValueNotifier<double> sheetExtent;
+  final List<AccessiblePlace> places;
+  final PlaceListSort sort;
+  final double bottomPadding;
+  final String? selectedPlaceId;
+  final VoidCallback onAddPlace;
+  final ValueChanged<PlaceListSort> onSortChanged;
+  final void Function(AccessiblePlace place) onPlaceSelected;
 
   @override
-  State<_PlaceCard> createState() => _PlaceCardState();
+  State<_SavedPlacesSheet> createState() => _SavedPlacesSheetState();
 }
 
-class _PlaceCardState extends State<_PlaceCard> {
-  double _userRating = 0;
+class _SavedPlacesSheetState extends State<_SavedPlacesSheet> {
+  static const _sheetKey = ValueKey<String>('saved_places_draggable_sheet');
+  static const _minSize = 0.12;
+  static const _initialSize = 0.14;
+  static const _maxSize = 0.52;
+
+  final _controller = DraggableScrollableController();
+
+  @override
+  void initState() {
+    super.initState();
+    widget.sheetExtent.value = _initialSize;
+    _controller.addListener(_onSheetMoved);
+  }
+
+  void _onSheetMoved() {
+    if (_controller.isAttached) {
+      widget.sheetExtent.value = _controller.size;
+    }
+  }
+
+  void expand() {
+    if (_controller.isAttached) {
+      _controller.animateTo(
+        0.45,
+        duration: const Duration(milliseconds: 320),
+        curve: Curves.easeOutCubic,
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.removeListener(_onSheetMoved);
+    _controller.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    final place = widget.place;
-    final tags = place.tags;
-    final color = place.color;
-
-    return GestureDetector(
-      onTap: widget.onTap,
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 14),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: YanYanaColors.surface,
-          borderRadius: BorderRadius.circular(24),
-          boxShadow: YanYanaShadows.card,
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  width: 52,
-                  height: 52,
-                  decoration: BoxDecoration(
-                    color: color.withOpacity(0.13),
-                    borderRadius: BorderRadius.circular(18),
-                  ),
-                  child: Icon(
-                    Icons.location_on_rounded,
-                    color: color,
-                    size: 27,
-                  ),
-                ),
-                const SizedBox(width: 13),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        place.name,
-                        style: const TextStyle(
-                          color: YanYanaColors.textDark,
-                          fontWeight: FontWeight.w900,
-                          fontSize: 15,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          const Icon(
-                            Icons.star_rounded,
-                            color: YanYanaColors.accentYellow,
-                            size: 16,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            place.rating.toStringAsFixed(1),
-                            style: const TextStyle(
-                              color: YanYanaColors.textMuted,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            '· ${place.distance}',
-                            style: const TextStyle(
-                              color: YanYanaColors.textMuted,
-                              fontSize: 13,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            '· ${place.userCommentCount} yorum',
-                            style: const TextStyle(
-                              color: YanYanaColors.textMuted,
-                              fontSize: 13,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 11,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: color.withOpacity(0.13),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    place.category,
-                    style: TextStyle(
-                      color: color,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 13),
-            Wrap(
-              spacing: 7,
-              runSpacing: 7,
-              children: tags
-                  .take(6)
-                  .map(
-                    (tag) => Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 5,
-                      ),
-                      decoration: BoxDecoration(
-                        color: YanYanaColors.surfaceSoft,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Text(
-                        tag,
-                        style: const TextStyle(
-                          color: YanYanaColors.textMuted,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ),
-                  )
-                  .toList(),
-            ),
-            const SizedBox(height: 13),
-            const Divider(height: 1, color: YanYanaColors.divider),
-            const SizedBox(height: 11),
-            Row(
-              children: [
-                const Text(
-                  'Hızlı Puan:',
-                  style: TextStyle(
-                    color: YanYanaColors.textMuted,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                ...List.generate(
-                  5,
-                  (index) => GestureDetector(
-                    onTap: () {
-                      setState(() => _userRating = index + 1.0);
-                    },
-                    child: Icon(
-                      index < _userRating
-                          ? Icons.star_rounded
-                          : Icons.star_outline_rounded,
-                      color: YanYanaColors.accentYellow,
-                      size: 23,
-                    ),
-                  ),
-                ),
-                const Spacer(),
-                const Icon(
-                  Icons.keyboard_arrow_up_rounded,
-                  color: YanYanaColors.textLight,
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
+    return DraggableScrollableSheet(
+      key: _sheetKey,
+      controller: _controller,
+      initialChildSize: _initialSize,
+      minChildSize: _minSize,
+      maxChildSize: _maxSize,
+      snap: true,
+      snapSizes: const [_minSize, _initialSize, 0.24, 0.38, _maxSize],
+      builder: (context, scrollController) {
+        return PlaceListPanel(
+          places: widget.places,
+          scrollController: scrollController,
+          sort: widget.sort,
+          hasAnyPlaces: widget.hasPlaces,
+          bottomPadding: widget.bottomPadding,
+          selectedPlaceId: widget.selectedPlaceId,
+          onAddPlace: widget.onAddPlace,
+          onSortChanged: widget.onSortChanged,
+          onPlaceSelected: widget.onPlaceSelected,
+        );
+      },
     );
   }
 }

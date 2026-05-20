@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:yanyana_p/core/constants/role_constants.dart';
+import 'package:yanyana_p/core/services/auth_service.dart';
 import 'package:yanyana_p/core/services/backend_orchestrator.dart';
 import 'package:yanyana_p/core/theme/theme.dart';
-import 'package:yanyana_p/features/home/main_page.dart';
+import 'package:yanyana_p/core/utils/app_utils.dart';
+import 'package:yanyana_p/features/auth/widgets/forgot_password_dialog.dart';
+import 'package:yanyana_p/features/auth/widgets/registered_email_field.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -31,24 +35,25 @@ class _LoginPageState extends State<LoginPage>
     return Scaffold(
       backgroundColor: YanYanaColors.background,
       body: SafeArea(
-        child: SingleChildScrollView(
-          child: Column(
-            children: [
-              _buildHeader(),
-              _buildTabBar(),
-              SizedBox(
-                height: 540,
-                child: TabBarView(
-                  controller: _tabController,
-                  children: [
-                    _LoginForm(tabController: _tabController),
-                    const _RegisterForm(),
-                  ],
-                ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+              child: _buildHeader(),
+            ),
+            _buildTabBar(),
+            Expanded(
+              child: TabBarView(
+                controller: _tabController,
+                children: [
+                  _LoginForm(tabController: _tabController),
+                  _RegisterForm(tabController: _tabController),
+                ],
               ),
-              _buildFooter(),
-            ],
-          ),
+            ),
+            _buildFooter(),
+          ],
         ),
       ),
     );
@@ -57,8 +62,8 @@ class _LoginPageState extends State<LoginPage>
   Widget _buildHeader() {
     return Container(
       width: double.infinity,
-      margin: const EdgeInsets.fromLTRB(20, 18, 20, 0),
-      padding: const EdgeInsets.fromLTRB(24, 34, 24, 32),
+      margin: const EdgeInsets.only(top: 10),
+      padding: const EdgeInsets.fromLTRB(24, 28, 24, 28),
       decoration: BoxDecoration(
         gradient: primaryGradient,
         borderRadius: BorderRadius.circular(32),
@@ -95,7 +100,7 @@ class _LoginPageState extends State<LoginPage>
           ),
           const SizedBox(height: 8),
           Text(
-            'Güvenli, erişilebilir ve destekleyici bir topluluk',
+            'Erişilebilir destek ve topluluk platformu',
             textAlign: TextAlign.center,
             style: TextStyle(
               color: Colors.white.withOpacity(0.9),
@@ -111,7 +116,7 @@ class _LoginPageState extends State<LoginPage>
 
   Widget _buildTabBar() {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 26, 24, 0),
+      padding: const EdgeInsets.fromLTRB(24, 18, 24, 0),
       child: Container(
         height: 54,
         padding: const EdgeInsets.all(5),
@@ -150,9 +155,10 @@ class _LoginPageState extends State<LoginPage>
 
   Widget _buildFooter() {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 20, top: 8),
+      padding: const EdgeInsets.only(bottom: 12, top: 4),
       child: Text(
         'Gizlilik Politikası · Kullanım Koşulları',
+        textAlign: TextAlign.center,
         style: TextStyle(
           color: YanYanaColors.textMuted.withOpacity(0.7),
           fontSize: 12,
@@ -187,6 +193,45 @@ class _LoginFormState extends State<_LoginForm> {
     super.dispose();
   }
 
+  void _showMessage(String text, {bool error = false}) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(text),
+        backgroundColor: error ? YanYanaColors.sos : YanYanaColors.textDark,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  Future<void> _signInWithGoogle() async {
+    setState(() => _loading = true);
+    try {
+      await BackendOrchestrator.instance.authService.signInWithGoogle();
+      if (!mounted) return;
+      setState(() => _loading = false);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+      final msg = e is AuthException
+          ? e.message
+          : 'Google ile giriş yapılamadı.';
+      _showMessage(msg, error: true);
+    }
+  }
+
+  Future<void> _openForgotPassword() async {
+    final sent = await showForgotPasswordDialog(
+      context: context,
+      initialEmail: _emailCtrl.text.trim(),
+    );
+    if (sent == true && mounted) {
+      _showMessage(
+        'Şifre sıfırlama bağlantısı e-postanıza gönderildi. Gelen kutunuzu ve spam klasörünü kontrol edin.',
+      );
+    }
+  }
+
   Future<void> _login() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -199,46 +244,32 @@ class _LoginFormState extends State<_LoginForm> {
       );
       if (!mounted) return;
       setState(() => _loading = false);
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const MainPage()),
-      );
-    } catch (_) {
+    } catch (e) {
       if (!mounted) return;
       setState(() => _loading = false);
+      final msg = e is AuthException
+          ? e.message
+          : 'Giriş yapılamadı. Lütfen tekrar deneyin.';
+      _showMessage(msg, error: true);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 28, 24, 0),
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(24, 20, 24, 16),
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
       child: Form(
         key: _formKey,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            YanYanaTextField(
-              controller: _emailCtrl,
-              label: 'E-posta',
-              hint: 'ornek@mail.com',
-              icon: Icons.email_outlined,
-              keyboardType: TextInputType.emailAddress,
-              validator: (v) {
-                if (v == null || v.trim().isEmpty) {
-                  return 'E-posta boş bırakılamaz';
-                }
-                if (!v.contains('@')) {
-                  return 'Geçerli bir e-posta girin';
-                }
-                return null;
-              },
-            ),
+            RegisteredEmailField(controller: _emailCtrl),
             const SizedBox(height: 16),
             YanYanaTextField(
               controller: _passCtrl,
               label: 'Şifre',
-              hint: 'En az 8 karakter',
+              hint: 'Şifrenizi girin',
               icon: Icons.lock_outline_rounded,
               obscureText: _obscure,
               suffixIcon: IconButton(
@@ -265,7 +296,7 @@ class _LoginFormState extends State<_LoginForm> {
             Align(
               alignment: Alignment.centerRight,
               child: TextButton(
-                onPressed: () {},
+                onPressed: _loading ? null : _openForgotPassword,
                 style: TextButton.styleFrom(
                   foregroundColor: YanYanaColors.primary,
                   padding: EdgeInsets.zero,
@@ -281,14 +312,37 @@ class _LoginFormState extends State<_LoginForm> {
                 ),
               ),
             ),
-            const SizedBox(height: 28),
-            GradientButton(
+            const SizedBox(height: 24),
+            Semantics(
+              button: true,
               label: 'Giriş Yap',
-              icon: Icons.arrow_forward_rounded,
-              isLoading: _loading,
-              onPressed: _login,
+              child: GradientButton(
+                label: 'Giriş Yap',
+                icon: Icons.arrow_forward_rounded,
+                isLoading: _loading,
+                onPressed: _login,
+              ),
             ),
-            const SizedBox(height: 22),
+            const SizedBox(height: 14),
+            Semantics(
+              button: true,
+              label: 'Google ile devam et',
+              child: OutlinedButton.icon(
+                onPressed: _loading ? null : _signInWithGoogle,
+                icon: const Icon(Icons.login_rounded, size: 22),
+                label: const Text(
+                  'Google ile devam et',
+                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                ),
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size(double.infinity, 48),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 18),
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -320,7 +374,9 @@ class _LoginFormState extends State<_LoginForm> {
 }
 
 class _RegisterForm extends StatefulWidget {
-  const _RegisterForm();
+  final TabController tabController;
+
+  const _RegisterForm({required this.tabController});
 
   @override
   State<_RegisterForm> createState() => _RegisterFormState();
@@ -338,7 +394,7 @@ class _RegisterFormState extends State<_RegisterForm> {
   bool _obscureConfirm = true;
   bool _loading = false;
 
-  String _role = 'disabled_user';
+  String _registerIntent = RegisterIntent.regularUser;
 
   @override
   void dispose() {
@@ -347,6 +403,35 @@ class _RegisterFormState extends State<_RegisterForm> {
     _passCtrl.dispose();
     _confirmCtrl.dispose();
     super.dispose();
+  }
+
+  void _showMessage(String text, {bool error = false}) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(text),
+        backgroundColor: error ? YanYanaColors.sos : YanYanaColors.textDark,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  Future<void> _signInWithGoogle() async {
+    setState(() => _loading = true);
+    try {
+      await BackendOrchestrator.instance.authService.signInWithGoogle(
+        registerIntent: _registerIntent,
+      );
+      if (!mounted) return;
+      setState(() => _loading = false);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+      final msg = e is AuthException
+          ? e.message
+          : 'Google ile kayıt yapılamadı.';
+      _showMessage(msg, error: true);
+    }
   }
 
   Future<void> _register() async {
@@ -359,47 +444,67 @@ class _RegisterFormState extends State<_RegisterForm> {
         _nameCtrl.text.trim(),
         _emailCtrl.text.trim(),
         _passCtrl.text,
-        _role,
+        _registerIntent,
       );
       if (!mounted) return;
       setState(() => _loading = false);
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const MainPage()),
-      );
-    } catch (_) {
+    } catch (e) {
       if (!mounted) return;
       setState(() => _loading = false);
+      final msg = e is AuthException
+          ? e.message
+          : 'Kayıt tamamlanamadı. Lütfen tekrar deneyin.';
+      _showMessage(msg, error: true);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
+      padding: const EdgeInsets.fromLTRB(24, 20, 24, 16),
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
       child: Form(
         key: _formKey,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Row(
-              children: [
-                _RoleChip(
-                  label: 'Kullanıcı',
-                  icon: Icons.accessibility_new_rounded,
-                  selected: _role == 'disabled_user',
-                  color: YanYanaColors.primary,
-                  onTap: () => setState(() => _role = 'disabled_user'),
-                ),
-                const SizedBox(width: 10),
-                _RoleChip(
-                  label: 'Gönüllü',
-                  icon: Icons.volunteer_activism_rounded,
-                  selected: _role == 'volunteer',
-                  color: YanYanaColors.secondary,
-                  onTap: () => setState(() => _role = 'volunteer'),
-                ),
-              ],
+            const Text(
+              'Hesap türü',
+              style: TextStyle(
+                color: YanYanaColors.textMuted,
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 10),
+            _RoleChip(
+              label: AppUserType.label(AppUserType.disabledUser),
+              icon: Icons.accessibility_new_rounded,
+              selected: _registerIntent == RegisterIntent.disabledUser,
+              color: YanYanaColors.primary,
+              onTap: () => setState(
+                () => _registerIntent = RegisterIntent.disabledUser,
+              ),
+            ),
+            const SizedBox(height: 8),
+            _RoleChip(
+              label: 'Gönüllü olmak istiyorum',
+              icon: Icons.volunteer_activism_rounded,
+              selected: _registerIntent == RegisterIntent.volunteerApply,
+              color: YanYanaColors.secondary,
+              onTap: () => setState(
+                () => _registerIntent = RegisterIntent.volunteerApply,
+              ),
+            ),
+            const SizedBox(height: 8),
+            _RoleChip(
+              label: AppUserType.label(AppUserType.regularUser),
+              icon: Icons.person_outline_rounded,
+              selected: _registerIntent == RegisterIntent.regularUser,
+              color: YanYanaColors.accentPurple,
+              onTap: () => setState(
+                () => _registerIntent = RegisterIntent.regularUser,
+              ),
             ),
             const SizedBox(height: 16),
             YanYanaTextField(
@@ -415,22 +520,7 @@ class _RegisterFormState extends State<_RegisterForm> {
               },
             ),
             const SizedBox(height: 12),
-            YanYanaTextField(
-              controller: _emailCtrl,
-              label: 'E-posta',
-              hint: 'ornek@mail.com',
-              icon: Icons.email_outlined,
-              keyboardType: TextInputType.emailAddress,
-              validator: (v) {
-                if (v == null || v.trim().isEmpty) {
-                  return 'E-posta boş bırakılamaz';
-                }
-                if (!v.contains('@')) {
-                  return 'Geçerli bir e-posta girin';
-                }
-                return null;
-              },
-            ),
+            RegisteredEmailField(controller: _emailCtrl),
             const SizedBox(height: 12),
             YanYanaTextField(
               controller: _passCtrl,
@@ -489,15 +579,61 @@ class _RegisterFormState extends State<_RegisterForm> {
                 return null;
               },
             ),
-            const SizedBox(height: 24),
-            GradientButton(
+            const SizedBox(height: 22),
+            Semantics(
+              button: true,
               label: 'Kayıt Ol',
-              icon: Icons.person_add_alt_1_rounded,
-              isLoading: _loading,
-              onPressed: _register,
-              gradient: supportGradient,
+              child: GradientButton(
+                label: 'Kayıt Ol',
+                icon: Icons.person_add_alt_1_rounded,
+                isLoading: _loading,
+                onPressed: _register,
+                gradient: supportGradient,
+              ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 14),
+            Semantics(
+              button: true,
+              label: 'Google ile devam et',
+              child: OutlinedButton.icon(
+                onPressed: _loading ? null : _signInWithGoogle,
+                icon: const Icon(Icons.login_rounded, size: 22),
+                label: const Text(
+                  'Google ile devam et',
+                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                ),
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size(double.infinity, 48),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 18),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Text(
+                  'Zaten hesabın var mı? ',
+                  style: TextStyle(
+                    color: YanYanaColors.textMuted,
+                    fontSize: 14,
+                  ),
+                ),
+                GestureDetector(
+                  onTap: () => widget.tabController.animateTo(0),
+                  child: const Text(
+                    'Giriş Yap',
+                    style: TextStyle(
+                      color: YanYanaColors.primary,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 14,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ],
         ),
       ),
@@ -522,38 +658,41 @@ class _RoleChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Expanded(
-      child: GestureDetector(
-        onTap: onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 220),
-          padding: const EdgeInsets.symmetric(vertical: 13),
-          decoration: BoxDecoration(
-            color: selected ? color : YanYanaColors.surface,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(
-              color: selected ? Colors.transparent : YanYanaColors.border,
-            ),
-            boxShadow: selected ? YanYanaShadows.soft : null,
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 220),
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: selected ? color : YanYanaColors.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: selected ? Colors.transparent : YanYanaColors.border,
           ),
-          child: Column(
-            children: [
-              Icon(
-                icon,
-                color: selected ? Colors.white : YanYanaColors.textMuted,
-                size: 22,
-              ),
-              const SizedBox(height: 5),
-              Text(
+          boxShadow: selected ? YanYanaShadows.soft : null,
+        ),
+        child: Row(
+          children: [
+            Icon(
+              icon,
+              color: selected ? Colors.white : YanYanaColors.textMuted,
+              size: 22,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
                 label,
                 style: TextStyle(
-                  color: selected ? Colors.white : YanYanaColors.textMuted,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w800,
+                  color: selected ? Colors.white : YanYanaColors.textDark,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
-            ],
-          ),
+            ),
+            if (selected)
+              const Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
+          ],
         ),
       ),
     );

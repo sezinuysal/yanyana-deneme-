@@ -1,7 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:yanyana_p/core/services/backend_orchestrator.dart';
+import 'package:yanyana_p/features/home/main_page.dart';
 import 'package:yanyana_p/core/theme/theme.dart';
+import 'package:yanyana_p/features/rooms/room_detail_page.dart';
 import 'package:yanyana_p/features/rooms/rooms_module.dart';
+import 'package:yanyana_p/shared/models/community_post.dart';
 import 'package:yanyana_p/shared/models/community_room.dart';
 
 class CommunityPage extends StatefulWidget {
@@ -14,7 +19,142 @@ class CommunityPage extends StatefulWidget {
 class _CommunityPageState extends State<CommunityPage> {
   final _orchestrator = BackendOrchestrator.instance;
 
+  List<CommunityPost> _posts = const [];
+  List<CommunityRoom> _rooms = const [];
+  bool _postsLoading = true;
+
   String _selectedCategory = 'Tümü';
+  StreamSubscription<List<CommunityRoom>>? _roomsSub;
+  StreamSubscription<List<CommunityPost>>? _postsSub;
+
+  @override
+  void initState() {
+    super.initState();
+    _postsSub = _orchestrator.streamCommunityPosts().listen(
+      (posts) {
+        if (!mounted) return;
+        setState(() {
+          _posts = posts;
+          _postsLoading = false;
+        });
+      },
+      onError: (_) => _reloadPostsFallback(),
+    );
+    _roomsSub = _orchestrator.streamCommunityRooms().listen((rooms) {
+      if (!mounted) return;
+      setState(() => _rooms = rooms);
+    });
+  }
+
+  @override
+  void dispose() {
+    _postsSub?.cancel();
+    _roomsSub?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _reloadPostsFallback() async {
+    try {
+      final posts = await _orchestrator.getCommunityPosts();
+      if (!mounted) return;
+      setState(() {
+        _posts = posts;
+        _postsLoading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _postsLoading = false);
+    }
+  }
+
+  Future<void> _showCreatePostSheet() async {
+    final titleCtrl = TextEditingController();
+    final bodyCtrl = TextEditingController();
+
+    final ok = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return Padding(
+          padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(ctx).bottom),
+          child: Container(
+            decoration: BoxDecoration(
+              color: YanYanaColors.surface,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+              boxShadow: YanYanaShadows.card,
+            ),
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Text(
+                  'Gönderi Paylaş',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                    color: YanYanaColors.textDark,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: titleCtrl,
+                  decoration: const InputDecoration(labelText: 'Başlık'),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: bodyCtrl,
+                  maxLines: 4,
+                  decoration: const InputDecoration(labelText: 'İçerik'),
+                ),
+                const SizedBox(height: 20),
+                GradientButton(
+                  label: 'Paylaş',
+                  icon: Icons.send_rounded,
+                  onPressed: () => Navigator.pop(ctx, true),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+
+    if (ok != true || !mounted) {
+      titleCtrl.dispose();
+      bodyCtrl.dispose();
+      return;
+    }
+
+    if (titleCtrl.text.trim().isEmpty || bodyCtrl.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Başlık ve içerik zorunludur.')),
+      );
+      titleCtrl.dispose();
+      bodyCtrl.dispose();
+      return;
+    }
+
+    try {
+      await _orchestrator.addCommunityPost(
+        title: titleCtrl.text,
+        content: bodyCtrl.text,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Gönderin başarıyla paylaşıldı.')),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Gönderi paylaşılamadı. Lütfen tekrar deneyin.')),
+      );
+    } finally {
+      titleCtrl.dispose();
+      bodyCtrl.dispose();
+    }
+  }
 
   final _categories = const [
     'Tümü',
@@ -25,10 +165,19 @@ class _CommunityPageState extends State<CommunityPage> {
     'Mentorluk',
   ];
 
-  List<CommunityRoom> get _rooms {
-    final rooms = _orchestrator.getRooms();
-    if (_selectedCategory == 'Tümü') return rooms;
-    return rooms.where((r) => r.category == _selectedCategory).toList();
+  List<CommunityRoom> get _filteredRooms {
+    if (_selectedCategory == 'Tümü') return _rooms;
+    return _rooms.where((r) => r.category == _selectedCategory).toList();
+  }
+
+  Future<void> _openRoom(CommunityRoom room) async {
+    final joined = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute<bool>(
+        builder: (_) => RoomDetailPage(room: room),
+      ),
+    );
+    if (joined == true) setState(() {});
   }
 
   void _showJoinDialog() {
@@ -179,13 +328,29 @@ class _CommunityPageState extends State<CommunityPage> {
                       child: GradientButton(
                         label: 'Oluştur',
                         icon: Icons.check_rounded,
-                        onPressed: () {
-                          Navigator.pop(context);
-                          ScaffoldMessenger.of(this.context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Oda oluşturma isteği prototip olarak kaydedildi.'),
-                            ),
-                          );
+                        onPressed: () async {
+                          if (nameCtrl.text.trim().isEmpty) {
+                            ScaffoldMessenger.of(this.context).showSnackBar(
+                              const SnackBar(content: Text('Oda adı zorunludur.')),
+                            );
+                            return;
+                          }
+                          try {
+                            await _orchestrator.createCommunityRoom(
+                              title: nameCtrl.text,
+                              category: category,
+                              description: descCtrl.text,
+                            );
+                            if (!mounted) return;
+                            Navigator.pop(context);
+                            ScaffoldMessenger.of(this.context).showSnackBar(
+                              const SnackBar(content: Text('Oda oluşturuldu.')),
+                            );
+                          } catch (e) {
+                            ScaffoldMessenger.of(this.context).showSnackBar(
+                              SnackBar(content: Text(e.toString())),
+                            );
+                          }
                         },
                       ),
                     ),
@@ -207,22 +372,125 @@ class _CommunityPageState extends State<CommunityPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: YanYanaColors.background,
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _showCreateRoomSheet,
-        backgroundColor: YanYanaColors.primary,
-        foregroundColor: Colors.white,
-        icon: const Icon(Icons.add_rounded),
-        label: const Text(
-          'Oda Oluştur',
-          style: TextStyle(fontWeight: FontWeight.w800),
-        ),
+      floatingActionButton: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          FloatingActionButton.extended(
+            heroTag: 'post',
+            onPressed: _showCreatePostSheet,
+            backgroundColor: YanYanaColors.secondary,
+            foregroundColor: Colors.white,
+            icon: const Icon(Icons.post_add_rounded),
+            label: const Text('Gönderi', style: TextStyle(fontWeight: FontWeight.w800)),
+          ),
+          const SizedBox(height: 10),
+          FloatingActionButton.extended(
+            heroTag: 'room',
+            onPressed: _showCreateRoomSheet,
+            backgroundColor: YanYanaColors.primary,
+            foregroundColor: Colors.white,
+            icon: const Icon(Icons.add_rounded),
+            label: const Text('Oda', style: TextStyle(fontWeight: FontWeight.w800)),
+          ),
+        ],
       ),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(20, 18, 20, 24),
+          padding: const EdgeInsets.fromLTRB(
+            20,
+            18,
+            20,
+            MainPage.bottomContentPadding,
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              const Text(
+                'Topluluk Akışı',
+                style: TextStyle(
+                  color: YanYanaColors.textDark,
+                  fontSize: 23,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 12),
+              if (_postsLoading)
+                const Padding(
+                  padding: EdgeInsets.all(24),
+                  child: Center(child: CircularProgressIndicator()),
+                )
+              else if (_posts.isEmpty)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(18),
+                  margin: const EdgeInsets.only(bottom: 20),
+                  decoration: BoxDecoration(
+                    color: YanYanaColors.surface,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: YanYanaColors.border),
+                  ),
+                  child: const Column(
+                    children: [
+                      Text(
+                        'Henüz topluluk gönderisi yok.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontWeight: FontWeight.w800,
+                          color: YanYanaColors.textDark,
+                        ),
+                      ),
+                      SizedBox(height: 6),
+                      Text(
+                        'İlk gönderiyi paylaşarak topluluğu başlatabilirsin.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: YanYanaColors.textMuted, fontSize: 13),
+                      ),
+                    ],
+                  ),
+                )
+              else
+                ..._posts.map(
+                  (p) => Container(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: YanYanaColors.surface,
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: YanYanaShadows.soft,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          p.title,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w900,
+                            color: YanYanaColors.textDark,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          p.body,
+                          style: const TextStyle(
+                            color: YanYanaColors.textMuted,
+                            fontSize: 13,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          p.authorName,
+                          style: const TextStyle(
+                            color: YanYanaColors.primary,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              const SizedBox(height: 8),
               GestureDetector(
                 behavior: HitTestBehavior.translucent,
                 onTap: () {
@@ -260,7 +528,24 @@ class _CommunityPageState extends State<CommunityPage> {
               const SizedBox(height: 14),
               _buildCategoryChips(),
               const SizedBox(height: 14),
-              ..._rooms.map(_RoomCard.new),
+              if (_filteredRooms.isEmpty)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(18),
+                  margin: const EdgeInsets.only(bottom: 12),
+                  decoration: BoxDecoration(
+                    color: YanYanaColors.surface,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: YanYanaColors.border),
+                  ),
+                  child: const Text(
+                    'Henüz topluluk odası yok. İlk odayı sen oluşturabilirsin.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: YanYanaColors.textMuted),
+                  ),
+                )
+              else
+                ..._filteredRooms.map((r) => _RoomCard(room: r, onOpen: () => _openRoom(r))),
               const SizedBox(height: 90),
             ],
           ),
@@ -310,20 +595,42 @@ class _CommunityPageState extends State<CommunityPage> {
 
 class _RoomCard extends StatelessWidget {
   final CommunityRoom room;
+  final VoidCallback onOpen;
 
-  const _RoomCard(this.room);
+  const _RoomCard({required this.room, required this.onOpen});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 14),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: YanYanaColors.surface,
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: YanYanaShadows.card,
-      ),
-      child: Column(
+    final backend = BackendOrchestrator.instance;
+
+    return FutureBuilder<bool>(
+      future: backend.isRoomJoined(room.id),
+      builder: (context, snap) {
+        final joined = snap.data == true;
+        return _roomCardContent(context, joined);
+      },
+    );
+  }
+
+  Widget _roomCardContent(BuildContext context, bool joined) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(24),
+          onTap: onOpen,
+          child: Ink(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: YanYanaColors.surface,
+              borderRadius: BorderRadius.circular(24),
+              boxShadow: YanYanaShadows.card,
+              border: joined
+                  ? Border.all(color: YanYanaColors.primary, width: 1.5)
+                  : null,
+            ),
+            child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
@@ -382,11 +689,8 @@ class _RoomCard extends StatelessWidget {
                 label: '${room.memberCount} üye',
                 color: YanYanaColors.accentBlue,
               ),
-              if (room.isVoiceEnabled)
-                _pill(
-                  label: 'Sesli sohbet prototipi',
-                  color: YanYanaColors.accentPurple,
-                ),
+              if (joined)
+                _pill(label: 'Katıldın', color: YanYanaColors.primary),
               if (room.isAuthorizedRoom)
                 _pill(
                   label: 'Yetkili oda',
@@ -398,27 +702,11 @@ class _RoomCard extends StatelessWidget {
           SizedBox(
             width: double.infinity,
             child: OutlinedButton.icon(
-              onPressed: () {
-                showDialog(
-                  context: context,
-                  builder: (_) => AlertDialog(
-                    title: const Text('Katılım (Prototip)'),
-                    content: const Text(
-                      'Bu oda prototip olarak açıldı. Gerçek zamanlı mesajlaşma ve sesli konuşma future integration olarak planlanmıştır.',
-                    ),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(context),
-                        child: const Text('Tamam'),
-                      ),
-                    ],
-                  ),
-                );
-              },
-              icon: const Icon(Icons.login_rounded),
-              label: const Text(
-                'Katıl',
-                style: TextStyle(fontWeight: FontWeight.w900),
+              onPressed: onOpen,
+              icon: Icon(joined ? Icons.check_rounded : Icons.login_rounded),
+              label: Text(
+                joined ? 'Detay / Katıldın' : 'Odayı Aç',
+                style: const TextStyle(fontWeight: FontWeight.w900),
               ),
               style: OutlinedButton.styleFrom(
                 foregroundColor: YanYanaColors.primary,
@@ -430,8 +718,11 @@ class _RoomCard extends StatelessWidget {
               ),
             ),
           ),
-        ],
+            ],
+          ),
+        ),
       ),
+    ),
     );
   }
 
