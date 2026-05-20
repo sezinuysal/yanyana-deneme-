@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:yanyana_p/core/services/backend_orchestrator.dart';
 import 'package:yanyana_p/core/theme/theme.dart';
-import 'package:yanyana_p/shared/data/mock_data.dart';
 import 'package:yanyana_p/shared/models/support_request.dart';
 
-/// Prototype: mock flow User → RequestManager → MatchingEngine → NotificationDispatcher.
+/// Support request flow: RequestManager → Firestore + MatchingEngine.
 class MatchingModulePage extends StatefulWidget {
   const MatchingModulePage({super.key});
 
@@ -41,8 +40,12 @@ class _MatchingModulePageState extends State<MatchingModulePage> {
       _lastResult = null;
     });
     final user = _orchestrator.getCurrentUser();
+    if (user == null) {
+      setState(() => _busy = false);
+      return;
+    }
     final desc = _descCtrl.text.trim().isEmpty
-        ? 'Kısa destek ihtiyacı (prototip).'
+        ? 'Kısa destek ihtiyacı.'
         : _descCtrl.text.trim();
 
     final req = SupportRequest(
@@ -64,7 +67,7 @@ class _MatchingModulePageState extends State<MatchingModulePage> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          'Talep orchestrator üzerinden işlendi (mock). ${_lastResult!}',
+          'Talep kaydedildi. ${_lastResult!}',
         ),
       ),
     );
@@ -72,6 +75,7 @@ class _MatchingModulePageState extends State<MatchingModulePage> {
 
   @override
   Widget build(BuildContext context) {
+    final user = _orchestrator.getCurrentUser();
     return Scaffold(
       backgroundColor: YanYanaColors.background,
       appBar: AppBar(
@@ -215,7 +219,7 @@ class _MatchingModulePageState extends State<MatchingModulePage> {
                 child: const Text(
                   'Akış (hedef mimari): Kullanıcı → RequestManager → '
                   'MatchingEngine → NotificationDispatcher. Bu ekranda '
-                  'BackendOrchestrator ile yerel mock servisler kullanılır.',
+                  'Talepler Firestore\'a kaydedilir ve eşleştirme sonucu bildirim oluşturulur.',
                   style: TextStyle(
                     color: YanYanaColors.textDark,
                     fontSize: 13,
@@ -224,15 +228,17 @@ class _MatchingModulePageState extends State<MatchingModulePage> {
                   ),
                 ),
               ),
-              const SizedBox(height: 8),
-              Text(
-                'Kullanıcı: ${MockData.currentUser.name}',
-                style: const TextStyle(
-                  color: YanYanaColors.textMuted,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
+              if (user != null) ...[
+                const SizedBox(height: 8),
+                Text(
+                  'Kullanıcı: ${user.name}',
+                  style: const TextStyle(
+                    color: YanYanaColors.textMuted,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
-              ),
+              ],
             ],
           ),
         ),

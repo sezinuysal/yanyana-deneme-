@@ -10,6 +10,7 @@ class AppRole {
 
   static const String disabledUser = 'disabled_user';
   static const String volunteer = 'volunteer';
+  static const String standardUser = 'standard_user';
   static const String admin = 'admin';
   static const String moderator = 'moderator';
 
@@ -20,6 +21,8 @@ class AppRole {
         return 'Engelli Kullanıcı';
       case volunteer:
         return 'Gönüllü';
+      case standardUser:
+        return 'Standart Kullanıcı';
       case admin:
         return 'Admin';
       case moderator:
@@ -34,6 +37,7 @@ class AppRole {
     switch (storedRole) {
       case disabledUser:
       case volunteer:
+      case standardUser:
       case admin:
       case moderator:
         return storedRole;

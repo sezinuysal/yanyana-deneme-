@@ -1,5 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:yanyana_p/core/constants/role_constants.dart';
 import 'package:yanyana_p/core/services/backend_orchestrator.dart';
+import 'package:yanyana_p/core/widgets/role_gate.dart';
 import 'package:yanyana_p/core/theme/theme.dart';
 import 'package:yanyana_p/shared/models/volunteer_application.dart';
 
@@ -26,16 +30,21 @@ class _VolunteerAdminPageState extends State<VolunteerAdminPage> {
   ];
 
   String _selectedArea = 'Ulaşım Desteği';
-  late List<VolunteerApplication> _applications;
+  List<VolunteerApplication> _applications = const [];
+  StreamSubscription<List<VolunteerApplication>>? _appsSub;
 
   @override
   void initState() {
     super.initState();
-    _applications = List.of(_orchestrator.getVolunteerApplications());
+    _appsSub = _orchestrator.streamVolunteerApplications().listen((apps) {
+      if (!mounted) return;
+      setState(() => _applications = apps);
+    });
   }
 
   @override
   void dispose() {
+    _appsSub?.cancel();
     _nameCtrl.dispose();
     _emailCtrl.dispose();
     _noteCtrl.dispose();
@@ -64,7 +73,9 @@ class _VolunteerAdminPageState extends State<VolunteerAdminPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return RoleGate(
+      allowedRoles: {AppAuthRole.admin},
+      child: Scaffold(
       backgroundColor: YanYanaColors.background,
       appBar: AppBar(
         backgroundColor: YanYanaColors.background,
@@ -218,13 +229,14 @@ class _VolunteerAdminPageState extends State<VolunteerAdminPage> {
           ),
         ),
       ),
+    ),
     );
   }
 
   Widget _buildApplicationCard(VolunteerApplication app) {
-    final statusColor = app.status == 'Onaylandı'
+    final statusColor = app.status == 'approved'
         ? YanYanaColors.success
-        : app.status == 'Reddedildi'
+        : app.status == 'rejected'
             ? YanYanaColors.sos
             : YanYanaColors.warning;
 
@@ -309,7 +321,7 @@ class _VolunteerAdminPageState extends State<VolunteerAdminPage> {
             children: [
               Expanded(
                 child: OutlinedButton.icon(
-                  onPressed: app.status == 'Beklemede' ? () => _approve(app) : null,
+                  onPressed: app.status == 'pending' ? () => _approve(app) : null,
                   icon: const Icon(Icons.check_rounded),
                   label: const Text(
                     'Onayla',
@@ -328,7 +340,7 @@ class _VolunteerAdminPageState extends State<VolunteerAdminPage> {
               const SizedBox(width: 10),
               Expanded(
                 child: OutlinedButton.icon(
-                  onPressed: app.status == 'Beklemede' ? () => _reject(app) : null,
+                  onPressed: app.status == 'pending' ? () => _reject(app) : null,
                   icon: const Icon(Icons.close_rounded),
                   label: const Text(
                     'Reddet',

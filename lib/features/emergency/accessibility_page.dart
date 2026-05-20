@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:yanyana_p/core/services/backend_orchestrator.dart';
+import 'package:yanyana_p/features/home/main_page.dart';
 import 'package:yanyana_p/core/theme/theme.dart';
-import 'package:yanyana_p/features/admin/volunteer_admin_page.dart';
+import 'package:yanyana_p/features/admin/admin_dashboard_page.dart';
+import 'package:yanyana_p/features/home/trusted_contacts_page.dart';
 import 'package:yanyana_p/shared/models/support_request.dart';
 
 class AccessibilityPage extends StatefulWidget {
@@ -27,13 +29,13 @@ class _AccessibilityPageState extends State<AccessibilityPage> {
 
   Future<void> _triggerSOS() async {
     await _run(() async {
-      final result = await _orchestrator.triggerSOS();
+      await _orchestrator.triggerSOS();
       if (!mounted) return;
       showDialog(
         context: context,
         builder: (_) => AlertDialog(
           title: const Text('SOS'),
-          content: Text(result),
+          content: const Text('SOS isteği başarıyla oluşturuldu.'),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
@@ -47,13 +49,47 @@ class _AccessibilityPageState extends State<AccessibilityPage> {
 
   Future<void> _startSafeCall() async {
     await _run(() async {
-      final result = await _orchestrator.startSafeCall();
+      final contacts = await _orchestrator.getTrustedContacts();
+      if (!mounted) return;
+      if (contacts.isEmpty) {
+        showDialog(
+          context: context,
+          builder: (_) => AlertDialog(
+            title: const Text('Güvenli Arama'),
+            content: const Text(
+              'Güvenli arama için önce güvenilir kişi eklemelisin.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('İptal'),
+              ),
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  Navigator.push<void>(
+                    context,
+                    MaterialPageRoute<void>(
+                      builder: (_) => const TrustedContactsPage(),
+                    ),
+                  );
+                },
+                child: const Text('Kişi Ekle'),
+              ),
+            ],
+          ),
+        );
+        return;
+      }
+      await _orchestrator.startSafeCall(trustedContactId: contacts.first.id);
       if (!mounted) return;
       showDialog(
         context: context,
         builder: (_) => AlertDialog(
           title: const Text('Güvenli Arama'),
-          content: Text(result),
+          content: Text(
+            'Güvenli arama isteği ${contacts.first.name} için başlatıldı.',
+          ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
@@ -68,6 +104,7 @@ class _AccessibilityPageState extends State<AccessibilityPage> {
   Future<void> _quickSupport() async {
     await _run(() async {
       final user = _orchestrator.getCurrentUser();
+      if (user == null) return;
       final req = SupportRequest(
         id: 'sr_${DateTime.now().millisecondsSinceEpoch}',
         requesterName: user.name,
@@ -104,7 +141,12 @@ class _AccessibilityPageState extends State<AccessibilityPage> {
       backgroundColor: YanYanaColors.background,
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(20, 18, 20, 24),
+          padding: const EdgeInsets.fromLTRB(
+            20,
+            18,
+            20,
+            MainPage.bottomContentPadding,
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -214,6 +256,7 @@ class _AccessibilityPageState extends State<AccessibilityPage> {
                   ],
                 ),
               ),
+              if (_orchestrator.isAdmin) ...[
               const SizedBox(height: 14),
               SizedBox(
                 width: double.infinity,
@@ -221,12 +264,14 @@ class _AccessibilityPageState extends State<AccessibilityPage> {
                   onPressed: () {
                     Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (_) => const VolunteerAdminPage()),
+                      MaterialPageRoute(
+                        builder: (_) => const AdminDashboardPage(),
+                      ),
                     );
                   },
                   icon: const Icon(Icons.admin_panel_settings_rounded),
                   label: const Text(
-                    'Gönüllü Yönetimi',
+                    'Admin Paneli',
                     style: TextStyle(fontWeight: FontWeight.w900),
                   ),
                   style: OutlinedButton.styleFrom(
@@ -239,6 +284,7 @@ class _AccessibilityPageState extends State<AccessibilityPage> {
                   ),
                 ),
               ),
+              ],
               const SizedBox(height: 90),
             ],
           ),
