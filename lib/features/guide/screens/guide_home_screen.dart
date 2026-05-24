@@ -21,10 +21,18 @@ class _GuideHomeScreenState extends State<GuideHomeScreen> {
 
   bool get _isStaff => AuthService.instance.currentUser?.isStaff ?? false;
 
-  bool get _canCreate {
+  bool get _canModerate {
     final user = AuthService.instance.currentUser;
     if (user == null) return false;
     return user.isStaff || user.userType == AppUserType.volunteer;
+  }
+
+  bool get _canCreate {
+    final user = AuthService.instance.currentUser;
+    if (user == null) return false;
+    return user.isStaff || 
+           user.userType == AppUserType.volunteer || 
+           user.userType == AppUserType.disabledUser;
   }
 
   /// Engelli kullanıcı: TTS erişilebilirlik butonu göster
@@ -61,8 +69,8 @@ class _GuideHomeScreenState extends State<GuideHomeScreen> {
       backgroundColor: Colors.transparent,
       body: Column(
         children: [
-          // ── Moderatör Bilgi Bandı ──
-          if (_isStaff)
+          // ── Moderatör / Gönüllü Bilgi Bandı ──
+          if (_canModerate)
             Container(
               margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -79,7 +87,7 @@ class _GuideHomeScreenState extends State<GuideHomeScreen> {
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      '${user?.authRoleLabel ?? 'Yetkili'} görünümü — Beklemedekiler dahil',
+                      'Yetkili / Gönüllü görünümü — Beklemedekiler dahil',
                       style: const TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
@@ -140,7 +148,7 @@ class _GuideHomeScreenState extends State<GuideHomeScreen> {
           // ── Liste ──
           Expanded(
             child: StreamBuilder<List<Guide>>(
-              stream: _isStaff
+              stream: _canModerate
                   ? GuideService.instance.streamAllGuides()
                   : GuideService.instance.streamApprovedGuides(),
               builder: (context, snapshot) {

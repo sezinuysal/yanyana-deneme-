@@ -69,10 +69,11 @@ class _GuideCreateScreenState extends State<GuideCreateScreen> {
             'description': _stepDescCtrls[i].text.trim(),
           }).where((s) => s['title']!.isNotEmpty).toList();
 
-      String roleLabel = 'Gönüllü';
+      String roleLabel = 'Kullanıcı';
       if (user.isAdmin) roleLabel = 'Admin';
       else if (user.isModerator) roleLabel = 'Moderatör';
       else if (user.userType == AppUserType.volunteer) roleLabel = 'Gönüllü';
+      else if (user.userType == AppUserType.disabledUser) roleLabel = 'Kullanıcı';
 
       await GuideService.instance.createGuide(
         title: _titleCtrl.text.trim(),

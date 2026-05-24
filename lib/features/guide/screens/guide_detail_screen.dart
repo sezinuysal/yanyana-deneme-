@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:yanyana_p/core/services/accessibility_service.dart';
+import 'package:yanyana_p/core/constants/role_constants.dart';
 import 'package:yanyana_p/core/services/auth_service.dart';
 import 'package:yanyana_p/core/services/guide_service.dart';
+import 'package:yanyana_p/core/services/guide_local_progress_service.dart';
 import 'package:yanyana_p/core/theme/theme.dart';
 import 'package:yanyana_p/shared/widgets/accessibility_widgets.dart';
 import '../models/guide_model.dart';
@@ -15,17 +17,39 @@ class GuideDetailScreen extends StatefulWidget {
 }
 
 class _GuideDetailScreenState extends State<GuideDetailScreen> {
-  bool _isStaff = false;
+  bool _canModerate = false;
   bool _isDisabledUser = false;
   bool _isApproving = false;
   bool _isLiking = false;
+  String _currentUserId = '';
+
+  // Local state
+  bool _hasLikedLocal = false;
+  List<String> _completedStepIds = [];
 
   @override
   void initState() {
     super.initState();
     final user = AuthService.instance.currentUser;
-    _isStaff = user?.isStaff ?? false;
-    _isDisabledUser = user?.userType == 'disabled_user';
+    _canModerate = user != null && 
+        (user.isStaff || user.userType == AppUserType.volunteer);
+    _isDisabledUser = user?.userType == AppUserType.disabledUser;
+    _currentUserId = user?.id ?? '';
+
+    _loadLocalProgress();
+  }
+
+  Future<void> _loadLocalProgress() async {
+    final progressService = GuideLocalProgressService.instance;
+    final hasLiked = await progressService.hasLikedGuide(widget.guide.id);
+    final completed = await progressService.getCompletedSteps(widget.guide.id);
+    
+    if (mounted) {
+      setState(() {
+        _hasLikedLocal = hasLiked;
+        _completedStepIds = completed;
+      });
+    }
   }
 
   @override
@@ -96,18 +120,88 @@ class _GuideDetailScreenState extends State<GuideDetailScreen> {
   }
 
   Future<void> _likeGuide() async {
-    if (_isLiking) return;
-    setState(() {
-      _isLiking = true;
-      widget.guide.likes++;
-    });
+    if (_hasLikedLocal) return; // Zaten beğenmiş
+
+    setState(() => _isLiking = true);
     try {
       await GuideService.instance.likeGuide(widget.guide.id);
-    } catch (_) {
-      setState(() => widget.guide.likes--);
+      await GuideLocalProgressService.instance.saveLike(widget.guide.id);
+      
+      if (mounted) {
+        setState(() {
+          widget.guide.likes++;
+          _hasLikedLocal = true;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Beğenilirken hata oluştu.')));
+      }
     } finally {
       if (mounted) setState(() => _isLiking = false);
     }
+  }
+
+  void _onStepCompleted(String stepId, bool isCompleted) async {
+    await GuideLocalProgressService.instance.toggleStepComplete(widget.guide.id, stepId, isCompleted);
+    
+    setState(() {
+      if (isCompleted) {
+        if (!_completedStepIds.contains(stepId)) _completedStepIds.add(stepId);
+      } else {
+        _completedStepIds.remove(stepId);
+      }
+    });
+
+    // Bütün adımlar tamamlandı mı kontrolü
+    if (isCompleted && _completedStepIds.length == widget.guide.steps.length) {
+      _showSuccessDialog();
+    }
+  }
+
+  void _showSuccessDialog() {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          child: Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [YanYanaColors.surface, Color(0xFFF0FFF4)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(24),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.emoji_events_rounded, color: Color(0xFFFFD700), size: 80),
+                const SizedBox(height: 16),
+                const Text('Harika İş Çıkardın!',
+                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: YanYanaColors.textDark)),
+                const SizedBox(height: 8),
+                Text('"${widget.guide.title}" rehberindeki tüm adımları başarıyla tamamladın.',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontSize: 14, color: YanYanaColors.textMuted)),
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  child: GradientButton(
+                    label: 'Teşekkürler!',
+                    icon: Icons.check_circle_outline,
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   /// Tüm rehber içeriğini TTS ile okutacak metin listesi
@@ -165,8 +259,8 @@ class _GuideDetailScreenState extends State<GuideDetailScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Moderasyon bandı — sadece staff
-                  if (!widget.guide.isApproved && _isStaff)
+                  // Moderasyon bandı — Yetkili veya Gönüllü (kendisi yazmadıysa)
+                  if (!widget.guide.isApproved && _canModerate)
                     Container(
                       margin: const EdgeInsets.only(bottom: 20),
                       padding: const EdgeInsets.all(16),
@@ -198,38 +292,61 @@ class _GuideDetailScreenState extends State<GuideDetailScreen> {
                                   fontSize: 13,
                                   color: YanYanaColors.textDark)),
                           const SizedBox(height: 14),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: _isApproving
-                                    ? const Center(
-                                        child: CircularProgressIndicator())
-                                    : GradientButton(
-                                        height: 48,
-                                        label: 'Onayla',
-                                        icon: Icons.check_rounded,
-                                        gradient: const LinearGradient(colors: [
-                                          YanYanaColors.success,
-                                          Color(0xFF16A34A),
-                                        ]),
-                                        onPressed: _approveGuide,
-                                      ),
+                          
+                          if (_currentUserId == widget.guide.authorId)
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: YanYanaColors.surface,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: YanYanaColors.border)
                               ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: GradientButton(
-                                  height: 48,
-                                  label: 'Reddet',
-                                  icon: Icons.close_rounded,
-                                  gradient: const LinearGradient(colors: [
-                                    YanYanaColors.sos,
-                                    Colors.redAccent,
-                                  ]),
-                                  onPressed: _rejectGuide,
+                              child: const Row(
+                                children: [
+                                  Icon(Icons.info_outline, color: YanYanaColors.primary, size: 20),
+                                  SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      'Kendi oluşturduğunuz rehberi onaylayamazsınız. Başka bir gönüllü veya yetkilinin onaylaması bekleniyor.',
+                                      style: TextStyle(fontSize: 12, color: YanYanaColors.textDark),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            )
+                          else
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _isApproving
+                                      ? const Center(
+                                          child: CircularProgressIndicator())
+                                      : GradientButton(
+                                          height: 48,
+                                          label: 'Onayla',
+                                          icon: Icons.check_rounded,
+                                          gradient: const LinearGradient(colors: [
+                                            YanYanaColors.success,
+                                            Color(0xFF16A34A),
+                                          ]),
+                                          onPressed: _approveGuide,
+                                        ),
                                 ),
-                              ),
-                            ],
-                          ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: GradientButton(
+                                    height: 48,
+                                    label: 'Reddet',
+                                    icon: Icons.close_rounded,
+                                    gradient: const LinearGradient(colors: [
+                                      YanYanaColors.sos,
+                                      Colors.redAccent,
+                                    ]),
+                                    onPressed: _rejectGuide,
+                                  ),
+                                ),
+                              ],
+                            ),
                         ],
                       ),
                     ),
