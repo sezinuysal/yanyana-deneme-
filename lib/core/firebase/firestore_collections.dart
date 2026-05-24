@@ -15,7 +15,4 @@ class FirestoreCollections {
   static const supportRequests = 'support_requests';
   static const trustedContacts = 'trusted_contacts';
   static const chatThreads = 'chat_threads';
-  static const dertlesmePosts = 'dertlesme_posts';
-  static const physioLogs = 'physio_logs';
 }
-

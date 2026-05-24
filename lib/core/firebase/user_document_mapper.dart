@@ -113,8 +113,6 @@ class UserDocumentMapper {
     String? businessLocation,
     String? businessPhone,
     List<String>? businessFacilities,
-    List<String>? badges,
-    int? points,
   }) {
     final map = <String, dynamic>{
       'updatedAt': FieldValue.serverTimestamp(),
@@ -143,8 +141,6 @@ class UserDocumentMapper {
     if (businessFacilities != null) {
       map['businessFacilities'] = businessFacilities;
     }
-    if (badges != null) map['badges'] = badges;
-    if (points != null) map['points'] = points;
     return map;
   }
 }

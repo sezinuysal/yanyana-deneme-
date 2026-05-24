@@ -4,10 +4,8 @@ import 'package:yanyana_p/core/services/auth_service.dart';
 import 'package:yanyana_p/core/services/chat_thread_service.dart';
 import 'package:yanyana_p/core/services/community_post_service.dart';
 import 'package:yanyana_p/core/services/community_service.dart';
-import 'package:yanyana_p/core/services/dertlesme_post_service.dart';
 import 'package:yanyana_p/core/services/matching_engine.dart';
 import 'package:yanyana_p/core/services/notification_service.dart';
-import 'package:yanyana_p/core/services/physio_log_service.dart';
 import 'package:yanyana_p/core/services/place_service.dart';
 import 'package:yanyana_p/core/services/profile_service.dart';
 import 'package:yanyana_p/core/services/request_manager.dart';
@@ -23,7 +21,6 @@ import 'package:yanyana_p/shared/models/app_user.dart';
 import 'package:yanyana_p/shared/models/chat_thread.dart';
 import 'package:yanyana_p/shared/models/community_post.dart';
 import 'package:yanyana_p/shared/models/community_room.dart';
-import 'package:yanyana_p/shared/models/dertlesme_post.dart';
 import 'package:yanyana_p/shared/models/emergency_request.dart';
 import 'package:yanyana_p/shared/models/notification_model.dart';
 import 'package:yanyana_p/shared/models/success_story.dart';
@@ -61,9 +58,6 @@ class BackendOrchestrator {
   final TrustedContactService trustedContactService =
       TrustedContactService.instance;
   final ChatThreadService chatThreadService = ChatThreadService.instance;
-  final DertlesmePostService dertlesmePostService =
-      DertlesmePostService.instance;
-  final PhysioLogService physioLogService = PhysioLogService.instance;
 
   late final RequestManager requestManager;
   final MatchingEngine matchingEngine;
@@ -168,8 +162,6 @@ class BackendOrchestrator {
     String? businessLocation,
     String? businessPhone,
     List<String>? businessFacilities,
-    List<String>? badges,
-    int? points,
   }) async {
     final user = authService.currentUser;
     if (user == null) throw StateError('Oturum açmanız gerekiyor.');
@@ -189,114 +181,9 @@ class BackendOrchestrator {
       businessLocation: businessLocation,
       businessPhone: businessPhone,
       businessFacilities: businessFacilities,
-      badges: badges,
-      points: points,
     );
     await authService.updateUser(updated);
     return updated;
-  }
-
-  // ── Rozet & Puan ─────────────────────────────────────────
-  Future<AppUser> awardBadge(String badgeId) async {
-    final user = authService.currentUser;
-    if (user == null) throw StateError('Oturum açmanız gerekiyor.');
-    final current = Set<String>.from(user.badges);
-    if (current.contains(badgeId)) return user; // zaten var
-    current.add(badgeId);
-    final updated = await profileService.updateBadgesAndPoints(
-      uid: user.id,
-      badges: current.toList(),
-      points: user.points + _badgePoints(badgeId),
-    );
-    await authService.updateUser(updated);
-    return updated;
-  }
-
-  int _badgePoints(String badgeId) {
-    const map = {
-      'first_login': 10,
-      'profile_complete': 50,
-      'first_post': 25,
-      'helper': 75,
-      'invisible_warrior': 30,
-      'physio_streak': 100,
-      'dertlesme_post': 15,
-    };
-    return map[badgeId] ?? 10;
-  }
-
-  // ── Dertleşme Duvarı ─────────────────────────────────────
-  Stream<List<DertlesmePost>> streamDertlesmePosts() =>
-      dertlesmePostService.streamPosts();
-
-  Future<void> addDertlesmePost({
-    required String body,
-    required String category,
-    required bool isAnonymous,
-  }) async {
-    final user = authService.currentUser;
-    if (user == null) throw StateError('Oturum açmanız gerekiyor.');
-    await dertlesmePostService.addPost(
-      authorId: user.id,
-      authorName: user.name,
-      isAnonymous: isAnonymous,
-      body: body,
-      category: category,
-    );
-    // İlk dertleşme gönderisi rozeti
-    await awardBadge('dertlesme_post').catchError((_) {});
-  }
-
-  Future<void> addDertlesmeReaction(String postId, String emoji) =>
-      dertlesmePostService.addReaction(postId: postId, emoji: emoji);
-
-  // ── Fizik Tedavi Logu ─────────────────────────────────────
-  Future<bool> logPhysioToday() async {
-    final user = authService.currentUser;
-    if (user == null) return false;
-    await physioLogService.logToday(user.id);
-    // Streak'i hesapla
-    final logs = await physioLogService.getRecentLogs(user.id, days: 8);
-    final streak = _calcStreak(logs);
-    if (streak >= 7) {
-      await awardBadge('physio_streak').catchError((_) {});
-    }
-    return true;
-  }
-
-  Future<bool> isPhysioDoneToday() async {
-    final user = authService.currentUser;
-    if (user == null) return false;
-    return physioLogService.isDoneToday(user.id);
-  }
-
-  Future<int> getPhysioStreak() async {
-    final user = authService.currentUser;
-    if (user == null) return 0;
-    final logs = await physioLogService.getRecentLogs(user.id, days: 60);
-    return _calcStreak(logs);
-  }
-
-  int _calcStreak(List<String> sortedDesc) {
-    if (sortedDesc.isEmpty) return 0;
-    int streak = 0;
-    DateTime cursor = DateTime.now();
-    for (final dateStr in sortedDesc) {
-      final parts = dateStr.split('-');
-      if (parts.length != 3) break;
-      final d = DateTime(
-          int.parse(parts[0]), int.parse(parts[1]), int.parse(parts[2]));
-      final diff = cursor
-          .difference(DateTime(d.year, d.month, d.day))
-          .inDays;
-      if (diff <= 1) {
-        streak++;
-        cursor = d;
-      } else {
-        break;
-      }
-    }
-    return streak;
   }
 
   Future<CommunityRoom> createCommunityRoom({
