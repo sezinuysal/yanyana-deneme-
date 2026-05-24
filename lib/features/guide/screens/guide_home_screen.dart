@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:yanyana_p/core/constants/role_constants.dart';
+import 'package:yanyana_p/core/services/auth_service.dart';
+import 'package:yanyana_p/core/services/guide_service.dart';
 import 'package:yanyana_p/core/theme/theme.dart';
+import 'package:yanyana_p/shared/widgets/accessibility_widgets.dart';
 import '../models/guide_model.dart';
 import 'guide_detail_screen.dart';
 import 'guide_create_screen.dart';
@@ -12,60 +16,91 @@ class GuideHomeScreen extends StatefulWidget {
 }
 
 class _GuideHomeScreenState extends State<GuideHomeScreen> {
-  String _searchQuery = "";
+  String _searchQuery = '';
   GuideCategory? _selectedCategory;
-  bool _isVolunteerMode = false; // Test amaçlı rol değiştirici
 
-  List<Guide> get _filteredGuides {
-    return mockGuides.where((guide) {
-      final matchesSearch = guide.title.toLowerCase().contains(_searchQuery.toLowerCase()) || 
-                            guide.description.toLowerCase().contains(_searchQuery.toLowerCase());
-      final matchesCategory = _selectedCategory == null || guide.category == _selectedCategory;
-      final matchesApproval = _isVolunteerMode ? true : guide.isApproved;
-      return matchesSearch && matchesCategory && matchesApproval;
+  bool get _isStaff => AuthService.instance.currentUser?.isStaff ?? false;
+
+  bool get _canCreate {
+    final user = AuthService.instance.currentUser;
+    if (user == null) return false;
+    return user.isStaff || user.userType == AppUserType.volunteer;
+  }
+
+  /// Engelli kullanıcı: TTS erişilebilirlik butonu göster
+  bool get _isDisabledUser {
+    final user = AuthService.instance.currentUser;
+    return user?.userType == AppUserType.disabledUser;
+  }
+
+  List<Guide> _filterGuides(List<Guide> guides) {
+    return guides.where((guide) {
+      final matchesSearch = _searchQuery.isEmpty ||
+          guide.title.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+          guide.description.toLowerCase().contains(_searchQuery.toLowerCase());
+      final matchesCategory =
+          _selectedCategory == null || guide.category == _selectedCategory;
+      return matchesSearch && matchesCategory;
     }).toList();
   }
 
-  String _getCategoryName(GuideCategory cat) {
-    switch (cat) {
-      case GuideCategory.dailyTasks: return "Günlük İşler";
-      case GuideCategory.recipes: return "Yemek Tarifleri";
-      case GuideCategory.socialSkills: return "Sosyal Beceriler";
-      case GuideCategory.other: return "Diğer";
+  List<String> _buildTtsText(List<Guide> guides) {
+    final buffer = <String>[];
+    buffer.add('Rehber sayfası. ${guides.length} rehber bulunuyor.');
+    for (final g in guides.take(5)) {
+      buffer.add('${g.title}. ${g.description}. ${g.likes} beğeni.');
     }
+    return buffer;
   }
 
   @override
   Widget build(BuildContext context) {
+    final user = AuthService.instance.currentUser;
+
     return Scaffold(
-      backgroundColor: Colors.transparent, // TabBar içinde düzgün durması için
+      backgroundColor: Colors.transparent,
       body: Column(
         children: [
-          // Rol Anahtarı
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                Text(_isVolunteerMode ? "Moderatör Modu (Gönüllü)" : "Normal Mod (Destekçi)", 
-                  style: const TextStyle(fontSize: 12, color: YanYanaColors.textMuted, fontWeight: FontWeight.bold)),
-                Switch(
-                  value: _isVolunteerMode,
-                  activeThumbColor: YanYanaColors.primary,
-                  onChanged: (val) => setState(() => _isVolunteerMode = val),
-                ),
-              ],
+          // ── Moderatör Bilgi Bandı ──
+          if (_isStaff)
+            Container(
+              margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              decoration: BoxDecoration(
+                color: YanYanaColors.warning.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                    color: YanYanaColors.warning.withValues(alpha: 0.4)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.verified_user_rounded,
+                      color: YanYanaColors.warning, size: 20),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      '${user?.authRoleLabel ?? 'Yetkili'} görünümü — Beklemedekiler dahil',
+                      style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: YanYanaColors.warning),
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-          
-          // Arama Çubuğu
+
+          const SizedBox(height: 12),
+
+          // ── Arama Çubuğu ──
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16.0),
             child: TextField(
               decoration: InputDecoration(
                 hintText: 'Rehber veya tarif ara...',
                 hintStyle: const TextStyle(color: YanYanaColors.textLight),
-                prefixIcon: const Icon(Icons.search, size: 24, color: YanYanaColors.primary),
+                prefixIcon: const Icon(Icons.search,
+                    size: 24, color: YanYanaColors.primary),
                 filled: true,
                 fillColor: YanYanaColors.surface,
                 border: OutlineInputBorder(
@@ -74,59 +109,143 @@ class _GuideHomeScreenState extends State<GuideHomeScreen> {
                 ),
                 contentPadding: const EdgeInsets.symmetric(vertical: 16),
               ),
-              style: const TextStyle(fontSize: 16, color: YanYanaColors.textDark),
+              style:
+                  const TextStyle(fontSize: 16, color: YanYanaColors.textDark),
               onChanged: (val) => setState(() => _searchQuery = val),
             ),
           ),
-          
+
           const SizedBox(height: 12),
-          
-          // Kategori Filtreleri
+
+          // ── Kategori Filtreleri ──
           SizedBox(
             height: 40,
             child: ListView(
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.symmetric(horizontal: 16),
               children: [
-                _buildFilterChip("Tümü", null),
+                _buildFilterChip('Tümü', null),
                 const SizedBox(width: 8),
-                _buildFilterChip("Günlük İşler", GuideCategory.dailyTasks),
+                _buildFilterChip('Günlük İşler', GuideCategory.dailyTasks),
                 const SizedBox(width: 8),
-                _buildFilterChip("Yemek Tarifleri", GuideCategory.recipes),
+                _buildFilterChip('Yemek Tarifleri', GuideCategory.recipes),
                 const SizedBox(width: 8),
-                _buildFilterChip("Sosyal Beceriler", GuideCategory.socialSkills),
+                _buildFilterChip('Sosyal Beceriler', GuideCategory.socialSkills),
               ],
             ),
           ),
-          
+
           const SizedBox(height: 16),
-          
-          // Liste
+
+          // ── Liste ──
           Expanded(
-            child: _filteredGuides.isEmpty
-              ? const Center(child: Text("Sonuç bulunamadı.", style: TextStyle(color: YanYanaColors.textMuted)))
-              : ListView.builder(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  itemCount: _filteredGuides.length,
-                  itemBuilder: (context, index) {
-                    final guide = _filteredGuides[index];
-                    return _buildGuideCard(guide);
-                  },
-                ),
+            child: StreamBuilder<List<Guide>>(
+              stream: _isStaff
+                  ? GuideService.instance.streamAllGuides()
+                  : GuideService.instance.streamApprovedGuides(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                if (snapshot.hasError) {
+                  return Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.wifi_off_rounded,
+                              size: 48, color: YanYanaColors.textLight),
+                          const SizedBox(height: 12),
+                          const Text(
+                            'Veriler yüklenirken sorun oluştu.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                                color: YanYanaColors.textDark,
+                                fontWeight: FontWeight.bold),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            '${snapshot.error}',
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                                color: YanYanaColors.textMuted, fontSize: 12),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }
+
+                final filtered = _filterGuides(snapshot.data ?? []);
+
+                if (filtered.isEmpty) {
+                  return Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.menu_book_outlined,
+                            size: 60, color: YanYanaColors.textLight),
+                        const SizedBox(height: 12),
+                        const Text(
+                          'Henüz rehber yok.\nİlk rehberi sen oluştur!',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: YanYanaColors.textMuted),
+                        ),
+                        // Engelli kullanıcı için sesli uyarı
+                        if (_isDisabledUser) ...[
+                          const SizedBox(height: 16),
+                          TtsReadButton(
+                            texts: const [
+                              'Henüz rehber bulunmuyor. Daha sonra tekrar kontrol edebilirsiniz.'
+                            ],
+                            tooltip: 'Sesli Oku',
+                          ),
+                        ],
+                      ],
+                    ),
+                  );
+                }
+
+                return Stack(
+                  children: [
+                    ListView.builder(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 80),
+                      itemCount: filtered.length,
+                      itemBuilder: (context, index) =>
+                          _buildGuideCard(filtered[index]),
+                    ),
+                    // Engelli kullanıcı için sayfayı sesli oku butonu
+                    if (_isDisabledUser)
+                      Positioned(
+                        bottom: 16,
+                        left: 16,
+                        right: 16,
+                        child: AccessibilityFab(
+                          textsToRead: _buildTtsText(filtered),
+                          readLabel: 'Rehberleri Sesli Oku',
+                        ),
+                      ),
+                  ],
+                );
+              },
+            ),
           ),
         ],
       ),
-      floatingActionButton: _isVolunteerMode
+      floatingActionButton: _canCreate
           ? FloatingActionButton.extended(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const GuideCreateScreen()),
-                );
-              },
+              heroTag: 'guide_create_fab',
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (context) => const GuideCreateScreen()),
+              ),
               backgroundColor: YanYanaColors.primary,
               icon: const Icon(Icons.add, color: Colors.white),
-              label: const Text("Yeni Rehber", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              label: const Text('Yeni Rehber',
+                  style: TextStyle(
+                      color: Colors.white, fontWeight: FontWeight.bold)),
             )
           : null,
     );
@@ -145,12 +264,12 @@ class _GuideHomeScreenState extends State<GuideHomeScreen> {
         ),
         child: Center(
           child: Text(
-            label, 
+            label,
             style: TextStyle(
-              fontSize: 14, 
+              fontSize: 14,
               fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
               color: isSelected ? Colors.white : YanYanaColors.textDark,
-            )
+            ),
           ),
         ),
       ),
@@ -167,100 +286,108 @@ class _GuideHomeScreenState extends State<GuideHomeScreen> {
       ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => GuideDetailScreen(guide: guide),
-            ),
-          ).then((_) => setState((){})); 
-        },
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(
+              builder: (context) => GuideDetailScreen(guide: guide)),
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Kapak Görseli
             if (guide.coverImageUrl != null)
               Image.network(
                 guide.coverImageUrl!,
                 height: 140,
                 width: double.infinity,
                 fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => _placeholderImage(),
               )
             else
-              Container(
-                height: 140,
-                width: double.infinity,
-                color: YanYanaColors.primaryLight,
-                child: const Icon(Icons.menu_book, size: 50, color: YanYanaColors.primary),
-              ),
-              
+              _placeholderImage(),
             Padding(
               padding: const EdgeInsets.all(16.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 4),
                         decoration: BoxDecoration(
                           color: YanYanaColors.secondaryLight,
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        child: Text(_getCategoryName(guide.category), style: const TextStyle(fontWeight: FontWeight.bold, color: YanYanaColors.secondary, fontSize: 12)),
+                        child: Text(guide.category.label,
+                            style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: YanYanaColors.secondary,
+                                fontSize: 12)),
                       ),
-                      Row(
-                        children: [
-                          if (!guide.isApproved)
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                              decoration: BoxDecoration(color: YanYanaColors.warning, borderRadius: BorderRadius.circular(8)),
-                              child: const Text("Beklemede", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11)),
-                            ),
-                          const SizedBox(width: 8),
-                          if (guide.isFavorite)
-                            const Icon(Icons.favorite, color: YanYanaColors.sos, size: 22),
-                        ],
-                      )
+                      const Spacer(),
+                      if (!guide.isApproved)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                              color: YanYanaColors.warning,
+                              borderRadius: BorderRadius.circular(8)),
+                          child: const Text('Beklemede',
+                              style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 11)),
+                        ),
+                      // Her kartta TTS butonu
+                      TtsReadButton(
+                        texts: ['${guide.title}. ${guide.description}'],
+                        iconSize: 22,
+                        tooltip: 'Sesli Oku',
+                      ),
                     ],
                   ),
                   const SizedBox(height: 10),
-                  Text(
-                    guide.title,
-                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: YanYanaColors.textDark),
-                  ),
+                  Text(guide.title,
+                      style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w900,
+                          color: YanYanaColors.textDark)),
                   const SizedBox(height: 4),
-                  Text(
-                    guide.description,
-                    style: const TextStyle(fontSize: 14, color: YanYanaColors.textMuted, height: 1.4),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
+                  Text(guide.description,
+                      style: const TextStyle(
+                          fontSize: 14,
+                          color: YanYanaColors.textMuted,
+                          height: 1.4),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis),
                   const SizedBox(height: 14),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Row(
                         children: [
-                          const Icon(Icons.thumb_up_alt_rounded, size: 16, color: YanYanaColors.accentBlue),
+                          const Icon(Icons.thumb_up_alt_rounded,
+                              size: 16, color: YanYanaColors.accentBlue),
                           const SizedBox(width: 4),
-                          Text("${guide.likes} Beğeni", style: const TextStyle(color: YanYanaColors.textMuted, fontSize: 12, fontWeight: FontWeight.bold)),
+                          Text('${guide.likes} Beğeni',
+                              style: const TextStyle(
+                                  color: YanYanaColors.textMuted,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold)),
                         ],
                       ),
-                      if (guide.progressPercentage > 0)
-                        Row(
-                          children: [
-                            const Icon(Icons.check_circle_rounded, size: 16, color: YanYanaColors.success),
-                            const SizedBox(width: 4),
-                            Text(
-                              "%${(guide.progressPercentage * 100).toInt()} Tamamlandı",
-                              style: const TextStyle(color: YanYanaColors.success, fontWeight: FontWeight.bold, fontSize: 12),
-                            ),
-                          ],
-                        )
+                      Row(
+                        children: [
+                          const Icon(Icons.person_outline,
+                              size: 14, color: YanYanaColors.textLight),
+                          const SizedBox(width: 4),
+                          Text(guide.authorName,
+                              style: const TextStyle(
+                                  color: YanYanaColors.textLight, fontSize: 12)),
+                        ],
+                      ),
                     ],
-                  )
+                  ),
                 ],
               ),
             ),
@@ -269,5 +396,13 @@ class _GuideHomeScreenState extends State<GuideHomeScreen> {
       ),
     );
   }
-}
 
+  Widget _placeholderImage() {
+    return Container(
+      height: 140,
+      width: double.infinity,
+      color: YanYanaColors.primaryLight,
+      child: const Icon(Icons.menu_book, size: 50, color: YanYanaColors.primary),
+    );
+  }
+}
