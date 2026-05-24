@@ -3,12 +3,11 @@ import 'package:yanyana_p/core/constants/role_constants.dart';
 import 'package:yanyana_p/core/services/backend_orchestrator.dart';
 import 'package:yanyana_p/core/services/profile_service.dart';
 import 'package:yanyana_p/core/theme/theme.dart';
-import 'package:yanyana_p/core/utils/feature_dialogs.dart';
 import 'package:yanyana_p/core/widgets/role_badges.dart';
 import 'package:yanyana_p/features/admin/admin_dashboard_page.dart';
 import 'package:yanyana_p/features/admin/moderator_dashboard_page.dart';
 import 'package:yanyana_p/features/home/main_page.dart';
-import 'package:yanyana_p/features/home/trusted_contacts_page.dart';
+import 'package:yanyana_p/features/profile/profile_gamification_widgets.dart';
 import 'package:yanyana_p/shared/models/app_user.dart';
 import 'package:yanyana_p/shared/models/volunteer_application.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
@@ -73,17 +72,34 @@ class _ProfilePageState extends State<ProfilePage> {
 
   double _profileCompletion(AppUser user) {
     var filled = 0;
-    const total = 7;
+    int total = 0;
+
     if (user.name.trim().isNotEmpty) filled++;
-    if (user.about.trim().isNotEmpty) filled++;
-    if (user.voiceIntro.trim().isNotEmpty) filled++;
-    if (user.interests.isNotEmpty) filled++;
-    if (user.communicationPreferences.isNotEmpty ||
-        user.communicationPreference.isNotEmpty) {
-      filled++;
+    total++;
+
+    if (user.userType == AppUserType.business) {
+      total += 4;
+      if (user.businessName.trim().isNotEmpty) filled++;
+      if (user.businessLocation.trim().isNotEmpty) filled++;
+      if (user.businessPhone.trim().isNotEmpty) filled++;
+      if (user.businessFacilities.isNotEmpty) filled++;
+    } else {
+      total += 4;
+      if (user.about.trim().isNotEmpty) filled++;
+      if (user.interests.isNotEmpty) filled++;
+      if (user.communicationPreferences.isNotEmpty ||
+          user.communicationPreference.isNotEmpty) {
+        filled++;
+      }
+      if (user.hasEmergencyContact) filled++;
+
+      if (user.userType == AppUserType.disabledUser) {
+        total += 1;
+        if (user.accessibilityNeeds.isNotEmpty) filled++;
+      }
     }
-    if (user.accessibilityNeeds.isNotEmpty) filled++;
-    if (user.hasEmergencyContact) filled++;
+
+    if (total == 0) return 0.0;
     return filled / total;
   }
 
@@ -192,6 +208,11 @@ class _ProfilePageState extends State<ProfilePage> {
                 ),
                 const SizedBox(height: 14),
 
+                if (user.userType == AppUserType.disabledUser) ...[
+                  GamificationSection(user: user, onBadgeAwarded: (u) => setState(() => _user = u)),
+                  const SizedBox(height: 14),
+                ],
+
                 if (user.userType == AppUserType.business) ...[
                   _BusinessInfoSection(user: user, onSaved: _onUserSaved),
                   const SizedBox(height: 14),
@@ -203,32 +224,43 @@ class _ProfilePageState extends State<ProfilePage> {
                   if (user.userType == AppUserType.disabledUser) ...[
                     _AccessibilitySection(user: user, onSaved: _onUserSaved),
                     const SizedBox(height: 14),
+                    InvisibleDisabilityBadgesSection(
+                      user: user,
+                      onSaved: _onUserSaved,
+                      onBadgeAwarded: (u) => setState(() => _user = u),
+                    ),
+                    const SizedBox(height: 14),
+                    PhysioReminderSection(user: user),
+                    const SizedBox(height: 14),
                   ],
                   _EmergencyContactSection(user: user, onSaved: _onUserSaved, onManage: _load),
                   const SizedBox(height: 14),
-                  _VolunteerCard(
-                    user: user,
-                    application: _volunteerApp,
-                    onApply: () async {
-                      try {
-                        final app = await _backend.submitVolunteerApplication(
-                          supportArea: 'Genel destek',
-                        );
-                        if (!mounted) return;
-                        setState(() => _volunteerApp = app);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Gönüllü başvurunuz alındı.'),
-                          ),
-                        );
-                      } catch (e) {
-                        if (!mounted) return;
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text(e.toString())),
-                        );
-                      }
-                    },
-                  ),
+                  
+                  if (user.userType != AppUserType.disabledUser) ...[
+                    _VolunteerCard(
+                      user: user,
+                      application: _volunteerApp,
+                      onApply: () async {
+                        try {
+                          final app = await _backend.submitVolunteerApplication(
+                            supportArea: 'Genel destek',
+                          );
+                          if (!mounted) return;
+                          setState(() => _volunteerApp = app);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Gönüllü başvurunuz alındı.'),
+                            ),
+                          );
+                        } catch (e) {
+                          if (!mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text(e.toString())),
+                          );
+                        }
+                      },
+                    ),
+                  ],
                 ],
 
                 if (user.isAdmin) ...[
@@ -1054,6 +1086,7 @@ class _AccessibilitySectionState extends State<_AccessibilitySection> {
   late Set<String> _selectedAccess;
 
   static const _commOptions = [
+    'Metin',
     'Yazılı iletişim',
     'Sesli iletişim',
     'Yavaş ve net iletişim',
@@ -1088,15 +1121,18 @@ class _AccessibilitySectionState extends State<_AccessibilitySection> {
       else
         ...widget.user.communicationPreferences
     };
-    _selectedAccess = {...widget.user.accessibilityNeeds};
+    _selectedAccess = {...widget.user.accessibilityNeeds.where((n) => !n.startsWith('inv_'))};
   }
 
   Future<void> _save() async {
     setState(() => _isSaving = true);
     try {
+      final invNeeds = widget.user.accessibilityNeeds.where((n) => n.startsWith('inv_')).toList();
+      final updatedAccess = [..._selectedAccess, ...invNeeds];
+
       final updated = await BackendOrchestrator.instance.updateProfile(
         communicationPreferences: _selectedComm.toList(),
-        accessibilityNeeds: _selectedAccess.toList(),
+        accessibilityNeeds: updatedAccess,
       );
       if (mounted) {
         widget.onSaved(updated);
