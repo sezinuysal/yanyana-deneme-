@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:yanyana_p/core/theme/theme.dart';
-import '../models/donation_model.dart';
 
 class DonationCreateScreen extends StatefulWidget {
   const DonationCreateScreen({super.key});
@@ -85,7 +84,7 @@ class _DonationCreateScreenState extends State<DonationCreateScreen> {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: YanYanaColors.primaryLight.withOpacity(0.5),
+                color: YanYanaColors.primaryLight.withValues(alpha: 0.5),
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(color: YanYanaColors.primaryLight),
               ),

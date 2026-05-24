@@ -86,6 +86,68 @@ class MockCommunityRoomsData {
     return rooms.where((r) => r.category == category).toList();
   }
 
+  /// Whether the current local owner can edit/delete this mock room.
+  static bool canManage(CommunityRoom room, String ownerId) {
+    if (room.createdByUserId.isEmpty) return false;
+    return room.createdByUserId == ownerId;
+  }
+
+  static CommunityRoom addLocalRoom({
+    required String title,
+    required String description,
+    required String category,
+    required List<String> accessibilityTags,
+    required String ownerId,
+  }) {
+    final id = 'mock-user-${DateTime.now().millisecondsSinceEpoch}';
+    final room = CommunityRoom(
+      id: id,
+      title: title.trim(),
+      category: category,
+      description: description.trim(),
+      memberCount: 1,
+      accessibilityTags: accessibilityTags,
+      createdByUserId: ownerId,
+    );
+    rooms.insert(0, room);
+    return room;
+  }
+
+  static void updateLocalRoom({
+    required String roomId,
+    required String title,
+    required String description,
+    required String category,
+    required List<String> accessibilityTags,
+    required String ownerId,
+  }) {
+    final index = rooms.indexWhere((r) => r.id == roomId);
+    if (index < 0) throw StateError('Oda bulunamadı.');
+    final existing = rooms[index];
+    if (!canManage(existing, ownerId)) {
+      throw StateError('Bu odayı düzenleme yetkiniz yok.');
+    }
+    rooms[index] = existing.copyWith(
+      title: title.trim(),
+      description: description.trim(),
+      category: category,
+      accessibilityTags: accessibilityTags,
+    );
+  }
+
+  static void deleteLocalRoom({
+    required String roomId,
+    required String ownerId,
+  }) {
+    final index = rooms.indexWhere((r) => r.id == roomId);
+    if (index < 0) throw StateError('Oda bulunamadı.');
+    final existing = rooms[index];
+    if (!canManage(existing, ownerId)) {
+      throw StateError('Bu odayı silme yetkiniz yok.');
+    }
+    rooms.removeAt(index);
+  }
+
   static CommunityRoom? roomById(String id) {
     for (final r in rooms) {
       if (r.id == id) return r;
@@ -98,6 +160,50 @@ class MockCommunityRoomsData {
       _seedMessages[roomId] ?? const [],
     );
   }
+
+  /// Shared community rules shown on every mock room detail screen.
+  static const List<String> communityGuidelineRules = [
+    'Saygılı olun ve farklı deneyimlere değer verin.',
+    'Kişisel hassas bilgilerinizi (adres, telefon vb.) paylaşmayın.',
+    'Başkalarına nazik ve destekleyici bir dille yaklaşın.',
+    'Güvensiz davranışları bildirin.',
+    'Odayı kapsayıcı ve erişilebilir tutun.',
+  ];
+
+  static const String _defaultPurpose =
+      'Bu oda, YanYana topluluğunda sosyal katılımı güçlendirmek, '
+      'yalnızlığı azaltmak ve kapsayıcı iletişimi desteklemek için açılmıştır.';
+
+  static String purposeFor(String roomId) {
+    return _roomPurposes[roomId] ?? _defaultPurpose;
+  }
+
+  static final Map<String, String> _roomPurposes = {
+    'mock-daily-chat':
+        'Günlük sohbet odası sosyal katılımı artırmak ve yalnızlık hissini '
+        'azaltmak için tasarlandı. Hafif sohbetlerle tanışın, gününüzü paylaşın '
+        've topluluğun bir parçası olun.',
+    'mock-support':
+        'Destek odası, zor anlarda akran desteği sunmak ve güvenli bir '
+        'dinleme alanı sağlamak için vardır. Birbirinize nazikçe eşlik edin; '
+        'profesyonel tedavi yerine geçmez.',
+    'mock-mentorship':
+        'Mentorluk odası deneyim paylaşımı, rehberlik ve kişisel gelişim '
+        'için açılmıştır. Kariyer, eğitim ve yaşam becerilerinde birbirinize '
+        'mentorluk yapabilirsiniz.',
+    'mock-accessibility':
+        'Bu oda erişilebilirlik deneyimlerini paylaşmak, farkındalık oluşturmak '
+        've pratik ipuçları sunmak içindir. Mekânlar, hizmetler ve günlük '
+        'yaşam deneyimlerinizi anlatın.',
+    'mock-events':
+        'Etkinlik ve duyuru odası topluluğu bilgilendirmek, sosyal buluşmaları '
+        'duyurmak ve katılımı teşvik etmek için kullanılır. Kapsayıcı etkinlik '
+        'haberlerini burada paylaşın.',
+    'mock-hobbies':
+        'Hobi ve sosyal oda, ortak ilgi alanları üzerinden bağ kurmayı ve '
+        'sosyal katılımı artırmayı hedefler. Hobileriniz aracılığıyla '
+        'yeni arkadaşlıklar keşfedin.',
+  };
 
   static const List<RoomPinnedInfo> pinnedGuidelines = [
     RoomPinnedInfo(
@@ -116,11 +222,6 @@ class MockCommunityRoomsData {
       icon: Icons.shield_outlined,
     ),
   ];
-
-  static RoomActivitySnapshot activityFor(String roomId) {
-    return _activity[roomId] ??
-        const RoomActivitySnapshot(onlineCount: 8, typingCount: 1);
-  }
 
   static List<RoomParticipant> participantsFor(String roomId) {
     return List<RoomParticipant>.from(
@@ -144,33 +245,6 @@ class MockCommunityRoomsData {
       avatarColorValue: 0xFF14B8A6,
     ),
   ];
-
-  static final Map<String, RoomActivitySnapshot> _activity = {
-    'mock-daily-chat': const RoomActivitySnapshot(
-      onlineCount: 24,
-      typingCount: 3,
-    ),
-    'mock-support': const RoomActivitySnapshot(
-      onlineCount: 12,
-      typingCount: 2,
-    ),
-    'mock-mentorship': const RoomActivitySnapshot(
-      onlineCount: 9,
-      typingCount: 1,
-    ),
-    'mock-accessibility': const RoomActivitySnapshot(
-      onlineCount: 15,
-      typingCount: 2,
-    ),
-    'mock-events': const RoomActivitySnapshot(
-      onlineCount: 18,
-      typingCount: 1,
-    ),
-    'mock-hobbies': const RoomActivitySnapshot(
-      onlineCount: 11,
-      typingCount: 2,
-    ),
-  };
 
   static final Map<String, List<RoomParticipant>> _participants = {
     'mock-daily-chat': [

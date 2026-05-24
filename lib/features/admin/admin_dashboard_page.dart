@@ -64,7 +64,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   @override
   Widget build(BuildContext context) {
     return RoleGate(
-      allowedRoles: {AppAuthRole.admin},
+      allowedRoles: const {AppAuthRole.admin},
       child: Scaffold(
         backgroundColor: YanYanaColors.background,
         body: SafeArea(
@@ -201,7 +201,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           Text(
             user?.name.isNotEmpty == true ? user!.name : 'Yönetici',
             style: TextStyle(
-              color: Colors.white.withOpacity(0.92),
+              color: Colors.white.withValues(alpha: 0.92),
               fontSize: 15,
             ),
           ),
@@ -209,7 +209,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           Text(
             user?.email ?? '',
             style: TextStyle(
-              color: Colors.white.withOpacity(0.8),
+              color: Colors.white.withValues(alpha: 0.8),
               fontSize: 13,
             ),
           ),

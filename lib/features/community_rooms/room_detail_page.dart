@@ -4,10 +4,11 @@ import 'package:yanyana_p/features/community_rooms/data/mock_community_rooms_dat
 import 'package:yanyana_p/features/community_rooms/widgets/room_actions_bar.dart';
 import 'package:yanyana_p/features/community_rooms/widgets/room_activity_bar.dart';
 import 'package:yanyana_p/features/community_rooms/widgets/room_chat_composer.dart';
+import 'package:yanyana_p/features/community_rooms/widgets/room_chat_panel.dart';
+import 'package:yanyana_p/features/community_rooms/widgets/room_community_guidelines.dart';
 import 'package:yanyana_p/features/community_rooms/widgets/room_detail_header.dart';
 import 'package:yanyana_p/features/community_rooms/widgets/room_members_preview.dart';
-import 'package:yanyana_p/features/community_rooms/widgets/room_message_bubble.dart';
-import 'package:yanyana_p/features/community_rooms/widgets/room_pinned_guidelines.dart';
+import 'package:yanyana_p/features/community_rooms/widgets/room_purpose_section.dart';
 import 'package:yanyana_p/shared/models/community_room.dart';
 import 'package:yanyana_p/shared/models/room_message.dart';
 
@@ -31,8 +32,9 @@ class RoomDetailPage extends StatefulWidget {
 }
 
 class _RoomDetailPageState extends State<RoomDetailPage> {
-  late bool _joined;
+  late bool isJoined;
   late bool _muted;
+  late int currentMemberCount;
   late List<RoomMessage> _messages;
   final _messageCtrl = TextEditingController();
   final _scrollCtrl = ScrollController();
@@ -41,8 +43,12 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
   @override
   void initState() {
     super.initState();
-    _joined = widget.initiallyJoined;
+    isJoined = widget.initiallyJoined;
     _muted = false;
+    currentMemberCount = widget.room.memberCount;
+    if (widget.initiallyJoined) {
+      currentMemberCount += 1;
+    }
     _messages = MockCommunityRoomsData.seedMessagesFor(widget.room.id);
     WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
   }
@@ -68,8 +74,26 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
     }
   }
 
+  void _toggleJoin() {
+    if (isJoined) {
+      _setJoined(false);
+    } else {
+      _setJoined(true);
+    }
+  }
+
   void _setJoined(bool value) {
-    setState(() => _joined = value);
+    setState(() {
+      if (value && !isJoined) {
+        currentMemberCount += 1;
+      } else if (!value && isJoined) {
+        currentMemberCount = (currentMemberCount - 1).clamp(
+          widget.room.memberCount,
+          999999,
+        );
+      }
+      isJoined = value;
+    });
     widget.onJoinChanged?.call(value);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -135,7 +159,7 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
 
   void _sendMessage() {
     final text = _messageCtrl.text.trim();
-    if (!_joined) {
+    if (!isJoined) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Mesaj göndermek için önce odaya katılın.')),
       );
@@ -168,8 +192,8 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
   @override
   Widget build(BuildContext context) {
     final room = widget.room;
-    final activity = MockCommunityRoomsData.activityFor(room.id);
     final participants = MockCommunityRoomsData.participantsFor(room.id);
+    final purpose = MockCommunityRoomsData.purposeFor(room.id);
 
     return Scaffold(
       backgroundColor: YanYanaColors.background,
@@ -182,23 +206,32 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                 SliverToBoxAdapter(
                   child: RoomDetailHeader(
                     room: room,
+                    memberCount: currentMemberCount,
+                    joined: isJoined,
                     onBack: () => Navigator.pop(context),
+                    onJoinToggle: _toggleJoin,
                   ),
                 ),
                 SliverToBoxAdapter(
-                  child: RoomActivityBar(activity: activity),
+                  child: RoomActivityBar(
+                    memberCount: currentMemberCount,
+                    chatActive: _messages.isNotEmpty,
+                  ),
+                ),
+                SliverToBoxAdapter(
+                  child: RoomPurposeSection(purposeText: purpose),
+                ),
+                const SliverToBoxAdapter(
+                  child: RoomCommunityGuidelines(
+                    rules: MockCommunityRoomsData.communityGuidelineRules,
+                  ),
                 ),
                 SliverToBoxAdapter(
                   child: RoomMembersPreview(participants: participants),
                 ),
                 SliverToBoxAdapter(
-                  child: RoomPinnedGuidelines(
-                    items: MockCommunityRoomsData.pinnedGuidelines,
-                  ),
-                ),
-                SliverToBoxAdapter(
                   child: RoomActionsBar(
-                    joined: _joined,
+                    joined: isJoined,
                     muted: _muted,
                     onJoin: _joinRoom,
                     onLeave: _leaveRoom,
@@ -220,67 +253,32 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                           ),
                         ),
                         const Spacer(),
-                        if (_joined)
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: YanYanaColors.success.withValues(alpha: 0.12),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: const Text(
-                              'Katıldın',
-                              style: TextStyle(
-                                color: YanYanaColors.success,
-                                fontWeight: FontWeight.w800,
-                                fontSize: 12,
-                              ),
-                            ),
+                        Text(
+                          '${_messages.length} mesaj',
+                          style: const TextStyle(
+                            color: YanYanaColors.textMuted,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13,
                           ),
+                        ),
                       ],
                     ),
                   ),
                 ),
-                if (_messages.isEmpty)
-                  const SliverToBoxAdapter(
-                    child: Padding(
-                      padding: EdgeInsets.all(32),
-                      child: Center(
-                        child: Text(
-                          'Henüz mesaj yok. İlk destekleyici mesajı sen yaz.',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            color: YanYanaColors.textMuted,
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
-                            height: 1.45,
-                          ),
-                        ),
-                      ),
-                    ),
-                  )
-                else
-                  SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 20),
-                    sliver: SliverList(
-                      delegate: SliverChildBuilderDelegate(
-                        (context, i) => RoomMessageBubble(
-                          message: _messages[i],
-                          showAuthor: !_messages[i].isFromMe,
-                        ),
-                        childCount: _messages.length,
-                      ),
-                    ),
+                SliverToBoxAdapter(
+                  child: RoomChatPanel(
+                    messages: _messages,
+                    joined: isJoined,
                   ),
+                ),
+                const SliverToBoxAdapter(child: SizedBox(height: 12)),
               ],
             ),
           ),
           RoomChatComposer(
             controller: _messageCtrl,
             onSend: _sendMessage,
-            enabled: _joined,
+            enabled: isJoined,
           ),
         ],
       ),

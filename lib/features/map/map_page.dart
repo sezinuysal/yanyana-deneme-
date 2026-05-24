@@ -664,7 +664,7 @@ class MapPageState extends State<MapPage> {
                       height: 28,
                       child: Container(
                         decoration: BoxDecoration(
-                          color: YanYanaColors.accentBlue.withOpacity(0.3),
+                          color: YanYanaColors.accentBlue.withValues(alpha: 0.3),
                           shape: BoxShape.circle,
                           border: Border.all(
                             color: YanYanaColors.accentBlue,
@@ -689,7 +689,7 @@ class MapPageState extends State<MapPage> {
               if (!_mapReady || _loading)
                 Positioned.fill(
                   child: Container(
-                    color: YanYanaColors.background.withOpacity(0.85),
+                    color: YanYanaColors.background.withValues(alpha: 0.85),
                     child: const Center(
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
@@ -715,7 +715,7 @@ class MapPageState extends State<MapPage> {
               left: 0,
               right: 0,
               child: Material(
-                color: YanYanaColors.warning.withOpacity(0.95),
+                color: YanYanaColors.warning.withValues(alpha: 0.95),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                   child: Row(
@@ -758,7 +758,7 @@ class MapPageState extends State<MapPage> {
                     decoration: InputDecoration(
                       hintText: 'Mekan veya semt ara…',
                       hintStyle: TextStyle(
-                        color: YanYanaColors.textMuted.withOpacity(0.85),
+                        color: YanYanaColors.textMuted.withValues(alpha: 0.85),
                         fontSize: 15,
                         fontWeight: FontWeight.w400,
                       ),
@@ -766,7 +766,7 @@ class MapPageState extends State<MapPage> {
                       contentPadding: const EdgeInsets.symmetric(vertical: 12),
                       prefixIcon: Icon(
                         Icons.search_rounded,
-                        color: YanYanaColors.textMuted.withOpacity(0.8),
+                        color: YanYanaColors.textMuted.withValues(alpha: 0.8),
                       ),
                       suffixIcon: Row(
                         mainAxisSize: MainAxisSize.min,
@@ -820,7 +820,7 @@ class MapPageState extends State<MapPage> {
                         child: Material(
                           elevation: 1,
                           borderRadius: BorderRadius.circular(12),
-                          color: YanYanaColors.primary.withOpacity(0.92),
+                          color: YanYanaColors.primary.withValues(alpha: 0.92),
                           child: InkWell(
                             borderRadius: BorderRadius.circular(12),
                             onTap: _openSavedPlacesPanel,
@@ -950,7 +950,7 @@ class MapPageState extends State<MapPage> {
                         MapCompactFab(
                           label: 'Ekle',
                           icon: Icons.add_location_alt_outlined,
-                          color: YanYanaColors.primary.withOpacity(0.95),
+                          color: YanYanaColors.primary.withValues(alpha: 0.95),
                           semanticLabel: 'Erişilebilir mekan ekle',
                           onPressed: _openAddPlace,
                         ),
@@ -958,7 +958,7 @@ class MapPageState extends State<MapPage> {
                         MapCompactFab(
                           label: 'Konum',
                           icon: Icons.my_location_rounded,
-                          color: YanYanaColors.secondary.withOpacity(0.95),
+                          color: YanYanaColors.secondary.withValues(alpha: 0.95),
                           semanticLabel: 'Konumumu göster',
                           onPressed: _showMyLocation,
                         ),

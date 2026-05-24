@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:yanyana_p/core/services/backend_orchestrator.dart';
-import 'package:yanyana_p/core/theme/app_theme.dart';
 import 'package:yanyana_p/core/theme/theme.dart';
+import 'package:yanyana_p/features/community/models/community_feed_content_type.dart';
+import 'package:yanyana_p/features/community/widgets/community_content_manager.dart';
+import 'package:yanyana_p/features/community/widgets/community_content_menu_button.dart';
 import 'package:yanyana_p/shared/models/success_story.dart';
 
 class SuccessStoriesPage extends StatefulWidget {
@@ -24,34 +26,20 @@ class _SuccessStoriesPageState extends State<SuccessStoriesPage> {
     }
   }
 
+  Future<void> _deleteStory(SuccessStory story) async {
+    await CommunityContentManager.deleteStory(context, story);
+  }
+
+  Future<void> _editStory(SuccessStory story) async {
+    await CommunityContentManager.editStory(context, story);
+  }
+
   Future<void> _showShareForm() async {
-    final data = await showModalBottomSheet<Map<String, String>>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => Padding(
-        padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(ctx).bottom),
-        child: const _ShareStorySheet(),
-      ),
+    await CommunityContentManager.createContent(
+      context,
+      initialType: CommunityFeedContentType.successStory,
+      lockType: true,
     );
-
-    if (data == null || !mounted) return;
-
-    try {
-      await _backend.addSuccessStory(
-        title: data['title']!,
-        content: data['content']!,
-      );
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Hikayen başarıyla paylaşıldı.')),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Hikaye paylaşılamadı: $e')),
-      );
-    }
   }
 
   @override
@@ -107,85 +95,20 @@ class _SuccessStoriesPageState extends State<SuccessStoriesPage> {
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 88),
               itemCount: stories.length,
               separatorBuilder: (_, __) => const SizedBox(height: 12),
-              itemBuilder: (_, i) => _StoryTile(story: stories[i]),
+              itemBuilder: (_, i) {
+                final story = stories[i];
+                final canManage =
+                    CommunityContentManager.canManageStory(story);
+                return _StoryTile(
+                  story: story,
+                  canManage: canManage,
+                  onEdit: () => _editStory(story),
+                  onDelete: () => _deleteStory(story),
+                );
+              },
             );
           },
         ),
-      ),
-    );
-  }
-}
-
-class _ShareStorySheet extends StatefulWidget {
-  const _ShareStorySheet();
-
-  @override
-  State<_ShareStorySheet> createState() => _ShareStorySheetState();
-}
-
-class _ShareStorySheetState extends State<_ShareStorySheet> {
-  final _titleCtrl = TextEditingController();
-  final _bodyCtrl = TextEditingController();
-
-  @override
-  void dispose() {
-    _titleCtrl.dispose();
-    _bodyCtrl.dispose();
-    super.dispose();
-  }
-
-  void _submit() {
-    final title = _titleCtrl.text.trim();
-    final body = _bodyCtrl.text.trim();
-    if (title.isEmpty || body.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Başlık ve hikaye alanları zorunludur.')),
-      );
-      return;
-    }
-    Navigator.pop(context, {'title': title, 'content': body});
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: YanYanaColors.surface,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-        boxShadow: YanYanaShadows.card,
-      ),
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const Text(
-            'Hikaye Paylaş',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w900,
-              color: YanYanaColors.textDark,
-            ),
-          ),
-          const SizedBox(height: 16),
-          TextField(
-            controller: _titleCtrl,
-            decoration: const InputDecoration(labelText: 'Başlık'),
-          ),
-          const SizedBox(height: 10),
-          TextField(
-            controller: _bodyCtrl,
-            maxLines: 4,
-            decoration: const InputDecoration(labelText: 'Hikayen'),
-          ),
-          const SizedBox(height: 20),
-          GradientButton(
-            label: 'Paylaş',
-            icon: Icons.send_rounded,
-            gradient: supportGradient,
-            onPressed: _submit,
-          ),
-        ],
       ),
     );
   }
@@ -207,7 +130,7 @@ class _EmptyStories extends StatelessWidget {
             Icon(
               Icons.auto_stories_outlined,
               size: 56,
-              color: YanYanaColors.textLight.withOpacity(0.85),
+              color: YanYanaColors.textLight.withValues(alpha: 0.85),
             ),
             const SizedBox(height: 16),
             const Text(
@@ -244,8 +167,16 @@ class _EmptyStories extends StatelessWidget {
 
 class _StoryTile extends StatelessWidget {
   final SuccessStory story;
+  final bool canManage;
+  final VoidCallback? onEdit;
+  final VoidCallback? onDelete;
 
-  const _StoryTile({required this.story});
+  const _StoryTile({
+    required this.story,
+    this.canManage = false,
+    this.onEdit,
+    this.onDelete,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -260,13 +191,25 @@ class _StoryTile extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            story.title,
-            style: const TextStyle(
-              color: YanYanaColors.textDark,
-              fontWeight: FontWeight.w900,
-              fontSize: 16,
-            ),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Text(
+                  story.title,
+                  style: const TextStyle(
+                    color: YanYanaColors.textDark,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 16,
+                  ),
+                ),
+              ),
+              if (canManage && onEdit != null && onDelete != null)
+                CommunityContentMenuButton(
+                  onEdit: onEdit!,
+                  onDelete: onDelete!,
+                ),
+            ],
           ),
           const SizedBox(height: 4),
           Text(

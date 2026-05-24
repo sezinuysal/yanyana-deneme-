@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:yanyana_p/core/services/backend_orchestrator.dart';
 import 'package:yanyana_p/core/theme/theme.dart';
 import 'package:yanyana_p/core/utils/relative_time.dart';
+import 'package:yanyana_p/features/community/utils/community_content_category.dart';
+import 'package:yanyana_p/features/community/widgets/community_content_manager.dart';
 import 'package:yanyana_p/features/community/widgets/community_post_preview_card.dart';
 import 'package:yanyana_p/features/community/widgets/community_story_preview_card.dart';
 import 'package:yanyana_p/features/home/success_stories_page.dart';
@@ -106,16 +108,14 @@ class _CommunityFeedSectionState extends State<CommunityFeedSection> {
     return list;
   }
 
-  String _categoryForPost(CommunityPost post) {
-    final t = post.title.toLowerCase();
-    if (t.contains('günün') || t.contains('söz')) return 'Günün Sözü';
-    if (t.contains('başarı')) return 'Başarı';
-    if (t.contains('farkındalık')) return 'Farkındalık';
-    if (t.contains('destek')) return 'Destek';
-    return 'Topluluk Gönderisi';
-  }
+  bool _canManagePost(CommunityPost post) =>
+      CommunityContentManager.canManagePost(post);
+
+  bool _canManageStory(SuccessStory story) =>
+      CommunityContentManager.canManageStory(story);
 
   void _openPostDetail(CommunityPost post) {
+    final canDelete = _canManagePost(post);
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -133,6 +133,15 @@ class _CommunityFeedSectionState extends State<CommunityFeedSection> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              Text(
+                communityPostCategoryLabel(post),
+                style: const TextStyle(
+                  color: YanYanaColors.secondary,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 12,
+                ),
+              ),
+              const SizedBox(height: 8),
               Text(
                 post.title,
                 style: const TextStyle(
@@ -159,6 +168,41 @@ class _CommunityFeedSectionState extends State<CommunityFeedSection> {
                   fontSize: 13,
                 ),
               ),
+              if (canDelete) ...[
+                const SizedBox(height: 20),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () async {
+                          Navigator.pop(ctx);
+                          await CommunityContentManager.editPost(context, post);
+                        },
+                        icon: const Icon(Icons.edit_outlined),
+                        label: const Text('Düzenle'),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () async {
+                          Navigator.pop(ctx);
+                          await CommunityContentManager.deletePost(
+                            context,
+                            post,
+                          );
+                        },
+                        icon: const Icon(Icons.delete_outline_rounded),
+                        label: const Text('Sil'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: YanYanaColors.sos,
+                          side: const BorderSide(color: YanYanaColors.sos),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ],
           ),
         ),
@@ -270,23 +314,59 @@ class _CommunityFeedSectionState extends State<CommunityFeedSection> {
             ),
           )
         else
-          ...entries.map((e) {
-            if (e.kind == _FeedKind.post) {
-              final post = e.post!;
-              return CommunityPostPreviewCard(
-                post: post,
-                timeLabel: formatRelativeTime(post.createdAt),
-                categoryLabel: _categoryForPost(post),
-                onTap: () => _openPostDetail(post),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final width = constraints.maxWidth;
+              final useGrid = width >= 640 && entries.length > 1;
+              final itemWidth =
+                  useGrid ? (width - 14) / 2 : width;
+
+              Widget cardFor(_FeedEntry e) {
+                if (e.kind == _FeedKind.post) {
+                  final post = e.post!;
+                  return CommunityPostPreviewCard(
+                    post: post,
+                    timeLabel: formatRelativeTime(post.createdAt),
+                    categoryLabel: communityPostCategoryLabel(post),
+                    onTap: () => _openPostDetail(post),
+                    canManage: _canManagePost(post),
+                    onEdit: () =>
+                        CommunityContentManager.editPost(context, post),
+                    onDelete: () =>
+                        CommunityContentManager.deletePost(context, post),
+                  );
+                }
+                final story = e.story!;
+                return CommunityStoryPreviewCard(
+                  story: story,
+                  timeLabel: formatRelativeTime(story.createdAt),
+                  onTap: _openStories,
+                  canManage: _canManageStory(story),
+                  onEdit: () =>
+                      CommunityContentManager.editStory(context, story),
+                  onDelete: () =>
+                      CommunityContentManager.deleteStory(context, story),
+                );
+              }
+
+              if (!useGrid) {
+                return Column(
+                  children: entries.map(cardFor).toList(),
+                );
+              }
+
+              return Wrap(
+                spacing: 14,
+                runSpacing: 0,
+                children: entries.map((e) {
+                  return SizedBox(
+                    width: itemWidth,
+                    child: cardFor(e),
+                  );
+                }).toList(),
               );
-            }
-            final story = e.story!;
-            return CommunityStoryPreviewCard(
-              story: story,
-              timeLabel: formatRelativeTime(story.createdAt),
-              onTap: _openStories,
-            );
-          }),
+            },
+          ),
       ],
     );
   }

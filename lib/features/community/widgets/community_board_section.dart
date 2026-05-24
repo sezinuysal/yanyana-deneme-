@@ -160,11 +160,11 @@ class _CommunityBoardSectionState extends State<CommunityBoardSection> {
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Expanded(
+            const Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
+                  Text(
                     'Topluluk Panosu',
                     style: TextStyle(
                       color: YanYanaColors.textDark,
@@ -173,8 +173,8 @@ class _CommunityBoardSectionState extends State<CommunityBoardSection> {
                       letterSpacing: -0.5,
                     ),
                   ),
-                  const SizedBox(height: 6),
-                  const Text(
+                  SizedBox(height: 6),
+                  Text(
                     'Başarı hikayeleri, farkındalık, etkinlikler ve destek paylaşımları.',
                     style: TextStyle(
                       color: YanYanaColors.textMuted,

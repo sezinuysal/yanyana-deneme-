@@ -125,7 +125,7 @@ class _NotificationsModulePageState extends State<NotificationsModulePage> {
                                 decoration: BoxDecoration(
                                   color: n.isRead
                                       ? YanYanaColors.surface
-                                      : YanYanaColors.primaryLight.withOpacity(0.55),
+                                      : YanYanaColors.primaryLight.withValues(alpha: 0.55),
                                   borderRadius: BorderRadius.circular(20),
                                   border: Border.all(
                                     color: n.isRead

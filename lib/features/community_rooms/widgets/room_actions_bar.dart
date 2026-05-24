@@ -29,9 +29,9 @@ class RoomActionsBar extends StatelessWidget {
         runSpacing: 10,
         children: [
           _ActionChip(
-            label: joined ? 'Odadan Ayrıl' : 'Odaya Katıl',
-            icon: joined ? Icons.logout_rounded : Icons.login_rounded,
-            filled: true,
+            label: joined ? 'Katıldın · Ayrıl' : 'Katıl',
+            icon: joined ? Icons.check_rounded : Icons.login_rounded,
+            filled: !joined,
             onPressed: joined ? onLeave : onJoin,
             semanticLabel: joined ? 'Odadan ayrıl' : 'Odaya katıl',
           ),

@@ -76,7 +76,7 @@ const LinearGradient sosGradient = LinearGradient(
 class YanYanaShadows {
   static List<BoxShadow> card = [
     BoxShadow(
-      color: const Color(0xFF475569).withOpacity(0.08),
+      color: const Color(0xFF475569).withValues(alpha: 0.08),
       blurRadius: 20,
       offset: const Offset(0, 10),
     ),
@@ -84,7 +84,7 @@ class YanYanaShadows {
 
   static List<BoxShadow> soft = [
     BoxShadow(
-      color: Colors.black.withOpacity(0.06),
+      color: Colors.black.withValues(alpha: 0.06),
       blurRadius: 18,
       offset: const Offset(0, 8),
     ),
@@ -92,7 +92,7 @@ class YanYanaShadows {
 
   static List<BoxShadow> nav = [
     BoxShadow(
-      color: Colors.black.withOpacity(0.08),
+      color: Colors.black.withValues(alpha: 0.08),
       blurRadius: 24,
       offset: const Offset(0, -8),
     ),

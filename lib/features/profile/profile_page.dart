@@ -312,7 +312,7 @@ class _ProfilePageState extends State<ProfilePage> {
                         Text(
                           'Bazı alanlar önbellekten yüklendi.',
                           style: TextStyle(
-                            color: YanYanaColors.warning.withOpacity(0.9),
+                            color: YanYanaColors.warning.withValues(alpha: 0.9),
                             fontSize: 13,
                           ),
                         ),
@@ -466,7 +466,7 @@ class _ProfilePageState extends State<ProfilePage> {
                             final app = await _backend.submitVolunteerApplication(
                               supportArea: 'Genel destek',
                             );
-                            if (!mounted) return;
+                            if (!context.mounted) return;
                             setState(() => _volunteerApp = app);
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
@@ -474,7 +474,7 @@ class _ProfilePageState extends State<ProfilePage> {
                               ),
                             );
                           } catch (e) {
-                            if (!mounted) return;
+                            if (!context.mounted) return;
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(content: Text(e.toString())),
                             );
@@ -529,7 +529,7 @@ class _ProfilePageState extends State<ProfilePage> {
                       ],
                       const SizedBox(height: 14),
                       _AccountActionsCard(onLogout: _logout),
-                      SizedBox(height: MainPage.bottomContentPadding * 0.35),
+                      const SizedBox(height: MainPage.bottomContentPadding * 0.35),
                     ],
                   ),
                 ),
@@ -605,7 +605,7 @@ class _ProfileHeaderCard extends StatelessWidget {
             user.email,
             textAlign: TextAlign.center,
             style: TextStyle(
-              color: Colors.white.withOpacity(0.92),
+              color: Colors.white.withValues(alpha: 0.92),
               fontSize: 14,
             ),
           ),
@@ -625,7 +625,7 @@ class _ProfileHeaderCard extends StatelessWidget {
           Text(
             'Profil tamamlanma: ${(completion * 100).round()}%',
             style: TextStyle(
-              color: Colors.white.withOpacity(0.9),
+              color: Colors.white.withValues(alpha: 0.9),
               fontSize: 12,
               fontWeight: FontWeight.w600,
             ),
@@ -813,9 +813,9 @@ class _EmergencyContactPreview extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: YanYanaColors.primaryLight.withOpacity(0.45),
+        color: YanYanaColors.primaryLight.withValues(alpha: 0.45),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: YanYanaColors.primary.withOpacity(0.25)),
+        border: Border.all(color: YanYanaColors.primary.withValues(alpha: 0.25)),
       ),
       child: Row(
         children: [
@@ -889,9 +889,9 @@ class _VolunteerCard extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 4),
-            Text(
+            const Text(
               'Başvurunuz inceleniyor. Sonuç bildirimlerde görünecek.',
-              style: const TextStyle(
+              style: TextStyle(
                 color: YanYanaColors.textMuted,
                 fontSize: 13,
               ),
@@ -957,7 +957,7 @@ class _AccountActionsCard extends StatelessWidget {
             ),
             style: OutlinedButton.styleFrom(
               side: const BorderSide(color: YanYanaColors.sosLight),
-              backgroundColor: YanYanaColors.sosLight.withOpacity(0.35),
+              backgroundColor: YanYanaColors.sosLight.withValues(alpha: 0.35),
             ),
           ),
         ),

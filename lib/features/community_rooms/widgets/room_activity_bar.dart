@@ -1,20 +1,28 @@
 import 'package:flutter/material.dart';
 import 'package:yanyana_p/core/theme/theme.dart';
-import 'package:yanyana_p/shared/models/room_participant.dart';
+import 'package:yanyana_p/features/community/utils/room_activity_stats.dart';
 
-/// Online / typing / activity indicators for a mock room.
+/// Dynamic online / activity indicators derived from [memberCount].
 class RoomActivityBar extends StatelessWidget {
-  final RoomActivitySnapshot activity;
+  final int memberCount;
+  final bool chatActive;
 
-  const RoomActivityBar({super.key, required this.activity});
+  const RoomActivityBar({
+    super.key,
+    required this.memberCount,
+    this.chatActive = false,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final onlineCount = estimateRoomOnlineCount(memberCount);
+    final showOnline = memberCount > 0 && onlineCount > 0;
+    final showChatLabel = chatActive || memberCount > 0;
+
     return Semantics(
-      label:
-          '${activity.onlineCount} üye çevrimiçi. '
-          '${activity.typingCount} kişi yazıyor.'
-          '${activity.isActiveToday ? " Bugün aktif." : ""}',
+      label: showOnline
+          ? '$onlineCount üye çevrimiçi.'
+          : 'Üye çevrimiçi bilgisi yok.',
       child: Container(
         margin: const EdgeInsets.fromLTRB(20, 16, 20, 0),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -26,11 +34,15 @@ class RoomActivityBar extends StatelessWidget {
         ),
         child: Row(
           children: [
-            _IndicatorDot(color: YanYanaColors.success),
+            _IndicatorDot(
+              color: showOnline ? YanYanaColors.success : YanYanaColors.textLight,
+            ),
             const SizedBox(width: 8),
             Expanded(
               child: Text(
-                '${activity.onlineCount} üye çevrimiçi',
+                showOnline
+                    ? '$onlineCount üye çevrimiçi'
+                    : 'Henüz çevrimiçi üye yok',
                 style: const TextStyle(
                   color: YanYanaColors.textDark,
                   fontWeight: FontWeight.w800,
@@ -38,24 +50,24 @@ class RoomActivityBar extends StatelessWidget {
                 ),
               ),
             ),
-            if (activity.typingCount > 0) ...[
+            if (showChatLabel) ...[
               const Icon(
-                Icons.edit_rounded,
+                Icons.forum_outlined,
                 size: 16,
                 color: YanYanaColors.textMuted,
               ),
               const SizedBox(width: 4),
-              Text(
-                '${activity.typingCount} kişi yazıyor',
-                style: const TextStyle(
+              const Text(
+                'Sohbet aktif',
+                style: TextStyle(
                   color: YanYanaColors.textMuted,
                   fontWeight: FontWeight.w700,
                   fontSize: 13,
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 8),
             ],
-            if (activity.isActiveToday)
+            if (memberCount > 0)
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                 decoration: BoxDecoration(

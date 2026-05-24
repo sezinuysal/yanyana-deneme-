@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:yanyana_p/core/theme/theme.dart';
+import 'package:yanyana_p/features/community/widgets/community_room_manager.dart';
 import 'package:yanyana_p/features/community_rooms/data/mock_community_rooms_data.dart';
 import 'package:yanyana_p/features/community_rooms/room_detail_page.dart';
 import 'package:yanyana_p/features/community_rooms/widgets/community_room_card.dart';
@@ -15,10 +16,16 @@ class CommunityRoomsPage extends StatefulWidget {
 
 class _CommunityRoomsPageState extends State<CommunityRoomsPage> {
   final Set<String> _joinedRoomIds = {};
+  final Set<String> _deletingRoomIds = {};
   String _selectedCategory = 'Tümü';
+  int _roomsRevision = 0;
 
-  List<CommunityRoom> get _filteredRooms =>
-      MockCommunityRoomsData.filterByCategory(_selectedCategory);
+  List<CommunityRoom> get _filteredRooms {
+    _roomsRevision;
+    return MockCommunityRoomsData.filterByCategory(_selectedCategory);
+  }
+
+  void _refreshRooms() => setState(() => _roomsRevision++);
 
   void _openRoom(CommunityRoom room) {
     Navigator.push<void>(
@@ -84,7 +91,7 @@ class _CommunityRoomsPageState extends State<CommunityRoomsPage> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
               child: Semantics(
                 label: 'Topluluk odaları açıklaması',
                 child: const Text(
@@ -124,15 +131,46 @@ class _CommunityRoomsPageState extends State<CommunityRoomsPage> {
                   : ListView.separated(
                       padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
                       itemCount: rooms.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 16),
+                      separatorBuilder: (_, __) => const SizedBox(height: 20),
                       itemBuilder: (context, index) {
                         final room = rooms[index];
                         final joined = _joinedRoomIds.contains(room.id);
+                        final canManage =
+                            CommunityRoomManager.canManageMockRoom(room);
                         return CommunityRoomCard(
                           room: room,
                           joined: joined,
                           onOpen: () => _openRoom(room),
                           onJoin: () => _joinRoom(room),
+                          canManage: canManage,
+                          onEdit: canManage
+                              ? () => CommunityRoomManager.editMockRoom(
+                                    context,
+                                    room,
+                                    _refreshRooms,
+                                  )
+                              : null,
+                          onDelete: canManage
+                              ? () => CommunityRoomManager.deleteMockRoom(
+                                    context,
+                                    room,
+                                    () {
+                                      _joinedRoomIds.remove(room.id);
+                                      _refreshRooms();
+                                    },
+                                    isDeleting: () =>
+                                        _deletingRoomIds.contains(room.id),
+                                    setDeleting: (v) {
+                                      setState(() {
+                                        if (v) {
+                                          _deletingRoomIds.add(room.id);
+                                        } else {
+                                          _deletingRoomIds.remove(room.id);
+                                        }
+                                      });
+                                    },
+                                  )
+                              : null,
                         );
                       },
                     ),

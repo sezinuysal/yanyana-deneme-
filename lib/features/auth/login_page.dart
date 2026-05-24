@@ -3,7 +3,6 @@ import 'package:yanyana_p/core/constants/role_constants.dart';
 import 'package:yanyana_p/core/services/auth_service.dart';
 import 'package:yanyana_p/core/services/backend_orchestrator.dart';
 import 'package:yanyana_p/core/theme/theme.dart';
-import 'package:yanyana_p/core/utils/app_utils.dart';
 import 'package:yanyana_p/features/auth/widgets/forgot_password_dialog.dart';
 import 'package:yanyana_p/features/auth/widgets/registered_email_field.dart';
 
@@ -75,10 +74,10 @@ class _LoginPageState extends State<LoginPage>
             width: 86,
             height: 86,
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.22),
+              color: Colors.white.withValues(alpha: 0.22),
               shape: BoxShape.circle,
               border: Border.all(
-                color: Colors.white.withOpacity(0.35),
+                color: Colors.white.withValues(alpha: 0.35),
                 width: 2,
               ),
             ),
@@ -103,7 +102,7 @@ class _LoginPageState extends State<LoginPage>
             'Erişilebilir destek ve topluluk platformu',
             textAlign: TextAlign.center,
             style: TextStyle(
-              color: Colors.white.withOpacity(0.9),
+              color: Colors.white.withValues(alpha: 0.9),
               fontSize: 14,
               height: 1.4,
               fontWeight: FontWeight.w500,
@@ -160,7 +159,7 @@ class _LoginPageState extends State<LoginPage>
         'Gizlilik Politikası · Kullanım Koşulları',
         textAlign: TextAlign.center,
         style: TextStyle(
-          color: YanYanaColors.textMuted.withOpacity(0.7),
+          color: YanYanaColors.textMuted.withValues(alpha: 0.7),
           fontSize: 12,
           fontWeight: FontWeight.w500,
         ),

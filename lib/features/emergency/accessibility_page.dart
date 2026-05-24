@@ -217,8 +217,8 @@ class _AccessibilityPageState extends State<AccessibilityPage> {
                 title: 'Erişilebilirlik Özellikleri',
                 icon: Icons.accessibility_new_rounded,
                 color: YanYanaColors.secondary,
-                child: Column(
-                  children: const [
+                child: const Column(
+                  children: [
                     _FeatureTile(
                       icon: Icons.menu_book_rounded,
                       title: 'Sesli Betimlemeli Okuma',
@@ -316,7 +316,7 @@ class _AccessibilityPageState extends State<AccessibilityPage> {
                 width: 34,
                 height: 34,
                 decoration: BoxDecoration(
-                  color: color.withOpacity(0.12),
+                  color: color.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(icon, color: color, size: 19),
@@ -374,7 +374,7 @@ class _FeatureTile extends StatelessWidget {
           width: 42,
           height: 42,
           decoration: BoxDecoration(
-            color: badgeColor.withOpacity(0.12),
+            color: badgeColor.withValues(alpha: 0.12),
             borderRadius: BorderRadius.circular(16),
           ),
           child: Icon(icon, color: badgeColor, size: 22),
@@ -399,9 +399,9 @@ class _FeatureTile extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                     decoration: BoxDecoration(
-                      color: badgeColor.withOpacity(0.12),
+                      color: badgeColor.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: badgeColor.withOpacity(0.18)),
+                      border: Border.all(color: badgeColor.withValues(alpha: 0.18)),
                     ),
                     child: Text(
                       badge,

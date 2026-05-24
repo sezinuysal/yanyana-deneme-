@@ -36,6 +36,51 @@ class SuccessStoryService {
     }
   }
 
+  Future<void> deleteStory({
+    required String storyId,
+    required String userId,
+  }) async {
+    final ref = _stories.doc(storyId);
+    try {
+      final snap = await ref.get();
+      if (!snap.exists) {
+        throw Exception('Hikaye bulunamadı.');
+      }
+      final ownerId = snap.data()?['userId'] as String? ?? '';
+      if (ownerId != userId) {
+        throw Exception('Bu hikayeyi silme yetkiniz yok.');
+      }
+      await ref.delete();
+    } catch (e) {
+      if (e is Exception) rethrow;
+      throw Exception(firebaseAuthErrorMessage(e));
+    }
+  }
+
+  Future<void> updateStory({
+    required String storyId,
+    required String userId,
+    required String title,
+    required String content,
+  }) async {
+    final ref = _stories.doc(storyId);
+    try {
+      final snap = await ref.get();
+      if (!snap.exists) throw Exception('Hikaye bulunamadı.');
+      final ownerId = snap.data()?['userId'] as String? ?? '';
+      if (ownerId != userId) {
+        throw Exception('Bu hikayeyi düzenleme yetkiniz yok.');
+      }
+      await ref.update({
+        'title': title.trim(),
+        'content': content.trim(),
+      });
+    } catch (e) {
+      if (e is Exception) rethrow;
+      throw Exception(firebaseAuthErrorMessage(e));
+    }
+  }
+
   Future<void> addStory({
     required String userId,
     required String authorName,

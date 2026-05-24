@@ -69,9 +69,7 @@ class AuthService {
       );
       final uid = cred.user!.uid;
       _appUser = await ProfileService.instance.getProfile(uid);
-      if (_appUser == null) {
-        _appUser = await ProfileService.instance.ensureUserDocument(cred.user!);
-      }
+      _appUser ??= await ProfileService.instance.ensureUserDocument(cred.user!);
       return _appUser!;
     } catch (e) {
       throw AuthException(firebaseAuthErrorMessage(e));
@@ -194,12 +192,10 @@ class AuthService {
       }
 
       _appUser = await ProfileService.instance.getProfile(fbUser.uid);
-      if (_appUser == null) {
-        _appUser = await ProfileService.instance.ensureUserDocument(
+      _appUser ??= await ProfileService.instance.ensureUserDocument(
           fbUser,
           provider: 'google',
         );
-      }
       return _appUser!;
     } catch (e) {
       throw AuthException(firebaseAuthErrorMessage(e));

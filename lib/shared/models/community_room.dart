@@ -22,19 +22,25 @@ class CommunityRoom {
   });
 
   CommunityRoom copyWith({
+    String? title,
+    String? category,
+    String? description,
     int? memberCount,
     List<String>? accessibilityTags,
+    bool? isVoiceEnabled,
+    bool? isAuthorizedRoom,
+    String? createdByUserId,
   }) {
     return CommunityRoom(
       id: id,
-      title: title,
-      category: category,
-      description: description,
+      title: title ?? this.title,
+      category: category ?? this.category,
+      description: description ?? this.description,
       memberCount: memberCount ?? this.memberCount,
       accessibilityTags: accessibilityTags ?? this.accessibilityTags,
-      isVoiceEnabled: isVoiceEnabled,
-      isAuthorizedRoom: isAuthorizedRoom,
-      createdByUserId: createdByUserId,
+      isVoiceEnabled: isVoiceEnabled ?? this.isVoiceEnabled,
+      isAuthorizedRoom: isAuthorizedRoom ?? this.isAuthorizedRoom,
+      createdByUserId: createdByUserId ?? this.createdByUserId,
     );
   }
 

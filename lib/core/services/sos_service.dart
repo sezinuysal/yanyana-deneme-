@@ -1,5 +1,4 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:latlong2/latlong.dart';
 import 'package:yanyana_p/core/firebase/firebase_auth_errors.dart';
 import 'package:yanyana_p/core/firebase/firestore_utils.dart';
 import 'package:yanyana_p/core/firebase/firestore_collections.dart';
@@ -83,8 +82,8 @@ class SOSService {
       final snap = await _sos.limit(200).get();
       final list = snap.docs.map(_fromDoc).toList();
       list.sort((a, b) {
-        final ta = a.createdAt?.millisecondsSinceEpoch ?? 0;
-        final tb = b.createdAt?.millisecondsSinceEpoch ?? 0;
+        final ta = a.createdAt.millisecondsSinceEpoch;
+        final tb = b.createdAt.millisecondsSinceEpoch;
         return tb.compareTo(ta);
       });
       return list;

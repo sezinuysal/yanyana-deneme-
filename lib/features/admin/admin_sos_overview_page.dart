@@ -35,7 +35,7 @@ class _AdminSosOverviewPageState extends State<AdminSosOverviewPage> {
   @override
   Widget build(BuildContext context) {
     return RoleGate(
-      allowedRoles: {AppAuthRole.admin},
+      allowedRoles: const {AppAuthRole.admin},
       child: Scaffold(
         backgroundColor: YanYanaColors.background,
         appBar: AppBar(

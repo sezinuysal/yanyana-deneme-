@@ -5,6 +5,8 @@ import 'package:yanyana_p/core/services/backend_orchestrator.dart';
 import 'package:yanyana_p/core/theme/theme.dart';
 import 'package:yanyana_p/core/utils/relative_time.dart';
 import 'package:yanyana_p/features/community/community_page.dart';
+import 'package:yanyana_p/features/community/utils/community_content_category.dart';
+import 'package:yanyana_p/features/community/widgets/community_content_manager.dart';
 import 'package:yanyana_p/features/community/widgets/community_post_preview_card.dart';
 import 'package:yanyana_p/features/community/widgets/community_story_preview_card.dart';
 import 'package:yanyana_p/features/home/home_palette.dart';
@@ -155,6 +157,12 @@ class _HomePageState extends State<HomePage> {
       );
     }
   }
+
+  bool _canManagePost(CommunityPost post) =>
+      CommunityContentManager.canManagePost(post);
+
+  bool _canManageStory(SuccessStory story) =>
+      CommunityContentManager.canManageStory(story);
 
   void _goSuccessStories({bool openShare = false}) {
     Navigator.push<void>(
@@ -429,7 +437,7 @@ class _HomePageState extends State<HomePage> {
                   onSos: _onSosTap,
                 ),
                 const SizedBox(height: 22),
-                _SectionTitle(
+                const _SectionTitle(
                   title: 'Bugün için önerilenler',
                   subtitle: 'Sana uygun adımlar',
                 ),
@@ -447,7 +455,7 @@ class _HomePageState extends State<HomePage> {
                     ),
                   ),
                 const SizedBox(height: 22),
-                _SectionTitle(
+                const _SectionTitle(
                   title: 'Son aktiviteler',
                   subtitle: 'Bildirimler ve güncellemeler',
                 ),
@@ -455,7 +463,7 @@ class _HomePageState extends State<HomePage> {
                 if (_loading)
                   const SizedBox.shrink()
                 else if (_notifications.isEmpty)
-                  _PastelEmptyCard(
+                  const _PastelEmptyCard(
                     background: HomePalette.lavender,
                     icon: Icons.history_rounded,
                     iconColor: HomePalette.primary,
@@ -489,7 +497,13 @@ class _HomePageState extends State<HomePage> {
                         (p) => CommunityPostPreviewCard(
                           post: p,
                           timeLabel: formatRelativeTime(p.createdAt),
+                          categoryLabel: communityPostCategoryLabel(p),
                           onTap: _goCommunity,
+                          canManage: _canManagePost(p),
+                          onEdit: () =>
+                              CommunityContentManager.editPost(context, p),
+                          onDelete: () =>
+                              CommunityContentManager.deletePost(context, p),
                         ),
                       ),
                 const SizedBox(height: 22),
@@ -516,6 +530,11 @@ class _HomePageState extends State<HomePage> {
                           story: s,
                           timeLabel: formatRelativeTime(s.createdAt),
                           onTap: () => _goSuccessStories(),
+                          canManage: _canManageStory(s),
+                          onEdit: () =>
+                              CommunityContentManager.editStory(context, s),
+                          onDelete: () =>
+                              CommunityContentManager.deleteStory(context, s),
                         ),
                       ),
               ],
@@ -631,7 +650,7 @@ class _GreetingCard extends StatelessWidget {
               width: 72,
               height: 72,
               decoration: BoxDecoration(
-                color: HomePalette.primary.withOpacity(0.08),
+                color: HomePalette.primary.withValues(alpha: 0.08),
                 shape: BoxShape.circle,
               ),
             ),
@@ -643,7 +662,7 @@ class _GreetingCard extends StatelessWidget {
               width: 56,
               height: 56,
               decoration: BoxDecoration(
-                color: const Color(0xFF14B8A6).withOpacity(0.1),
+                color: const Color(0xFF14B8A6).withValues(alpha: 0.1),
                 shape: BoxShape.circle,
               ),
             ),
@@ -700,7 +719,7 @@ class _GreetingCard extends StatelessWidget {
                         : Icons.groups_outlined,
                     label: communityActive ? 'Topluluk hazır' : 'Topluluğa katıl',
                     color: HomePalette.softBlue,
-                    iconColor: Color(0xFF3B82F6),
+                    iconColor: const Color(0xFF3B82F6),
                   ),
                 ],
               ),
@@ -732,7 +751,7 @@ class _StatusChip extends StatelessWidget {
       decoration: BoxDecoration(
         color: color,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withOpacity(0.7)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.7)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -772,7 +791,7 @@ class _EmergencyCard extends StatelessWidget {
       decoration: BoxDecoration(
         gradient: HomePalette.emergencyGradient,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: HomePalette.softPink.withOpacity(0.8)),
+        border: Border.all(color: HomePalette.softPink.withValues(alpha: 0.8)),
         boxShadow: YanYanaShadows.soft,
       ),
       child: Column(
@@ -784,7 +803,7 @@ class _EmergencyCard extends StatelessWidget {
                 width: 48,
                 height: 48,
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.85),
+                  color: Colors.white.withValues(alpha: 0.85),
                   borderRadius: BorderRadius.circular(16),
                 ),
                 child: const Icon(
@@ -829,7 +848,7 @@ class _EmergencyCard extends StatelessWidget {
                   child: OutlinedButton.icon(
                     onPressed: onSafeCall,
                     style: OutlinedButton.styleFrom(
-                      backgroundColor: Colors.white.withOpacity(0.85),
+                      backgroundColor: Colors.white.withValues(alpha: 0.85),
                       foregroundColor: HomePalette.textDark,
                       side: const BorderSide(color: Color(0xFFFFD6DE)),
                       shape: RoundedRectangleBorder(
@@ -906,7 +925,7 @@ class _RecommendedCard extends StatelessWidget {
           decoration: BoxDecoration(
             color: action.background,
             borderRadius: BorderRadius.circular(22),
-            border: Border.all(color: Colors.white.withOpacity(0.8)),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.8)),
             boxShadow: YanYanaShadows.soft,
           ),
           child: Row(
@@ -915,7 +934,7 @@ class _RecommendedCard extends StatelessWidget {
                 width: 48,
                 height: 48,
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.75),
+                  color: Colors.white.withValues(alpha: 0.75),
                   borderRadius: BorderRadius.circular(16),
                 ),
                 child: Icon(action.icon, color: action.iconColor, size: 26),
@@ -948,7 +967,7 @@ class _RecommendedCard extends StatelessWidget {
               Icon(
                 Icons.arrow_forward_ios_rounded,
                 size: 16,
-                color: action.iconColor.withOpacity(0.8),
+                color: action.iconColor.withValues(alpha: 0.8),
               ),
             ],
           ),
@@ -1129,7 +1148,7 @@ class _PastelEmptyCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: background,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.white.withOpacity(0.9)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.9)),
         boxShadow: YanYanaShadows.soft,
       ),
       child: Column(
@@ -1138,7 +1157,7 @@ class _PastelEmptyCard extends StatelessWidget {
             width: 56,
             height: 56,
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.75),
+              color: Colors.white.withValues(alpha: 0.75),
               shape: BoxShape.circle,
             ),
             child: Icon(icon, color: iconColor, size: 30),

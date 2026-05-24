@@ -1,6 +1,4 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:yanyana_p/core/firebase/firebase_auth_errors.dart';
 import 'package:yanyana_p/core/firebase/firestore_collections.dart';
 import 'package:yanyana_p/shared/models/community_room.dart';
 

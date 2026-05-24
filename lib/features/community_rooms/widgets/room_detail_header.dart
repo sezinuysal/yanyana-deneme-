@@ -5,19 +5,25 @@ import 'package:yanyana_p/shared/models/community_room.dart';
 /// Gradient banner header for mock room detail.
 class RoomDetailHeader extends StatelessWidget {
   final CommunityRoom room;
+  final int memberCount;
+  final bool joined;
   final VoidCallback onBack;
+  final VoidCallback onJoinToggle;
 
   const RoomDetailHeader({
     super.key,
     required this.room,
+    required this.memberCount,
+    required this.joined,
     required this.onBack,
+    required this.onJoinToggle,
   });
 
   @override
   Widget build(BuildContext context) {
     return Semantics(
       label:
-          '${room.title}. ${room.category}. ${room.memberCount} üye. ${room.description}',
+          '${room.title}. ${room.category}. $memberCount üye. ${room.description}',
       child: Stack(
         clipBehavior: Clip.none,
         children: [
@@ -103,13 +109,34 @@ class RoomDetailHeader extends StatelessWidget {
                     ),
                     const SizedBox(width: 6),
                     Text(
-                      '${room.memberCount} üye',
+                      '$memberCount üye',
                       style: const TextStyle(
                         color: YanYanaColors.textDark,
                         fontWeight: FontWeight.w800,
                         fontSize: 14,
                       ),
                     ),
+                    if (joined) ...[
+                      const SizedBox(width: 10),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: YanYanaColors.success.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Text(
+                          'Üyesin',
+                          style: TextStyle(
+                            color: YanYanaColors.success,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
                 if (room.accessibilityTags.isNotEmpty) ...[
@@ -152,6 +179,38 @@ class RoomDetailHeader extends StatelessWidget {
                     fontSize: 15,
                     height: 1.5,
                     fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Semantics(
+                  label: joined ? 'Katıldın, ayrılmak için dokun' : 'Odaya katıl',
+                  button: true,
+                  child: SizedBox(
+                    width: double.infinity,
+                    height: 52,
+                    child: FilledButton.icon(
+                      onPressed: onJoinToggle,
+                      style: FilledButton.styleFrom(
+                        backgroundColor: joined
+                            ? YanYanaColors.success
+                            : YanYanaColors.primary,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(18),
+                        ),
+                      ),
+                      icon: Icon(
+                        joined ? Icons.check_circle_rounded : Icons.login_rounded,
+                        size: 24,
+                      ),
+                      label: Text(
+                        joined ? 'Katıldın' : 'Katıl',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w900,
+                          fontSize: 16,
+                        ),
+                      ),
+                    ),
                   ),
                 ),
               ],

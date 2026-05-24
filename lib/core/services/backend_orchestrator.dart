@@ -4,6 +4,8 @@ import 'package:yanyana_p/core/services/auth_service.dart';
 import 'package:yanyana_p/core/services/chat_thread_service.dart';
 import 'package:yanyana_p/core/services/community_post_service.dart';
 import 'package:yanyana_p/core/services/community_service.dart';
+import 'package:yanyana_p/core/services/live_community_room_service.dart';
+import 'package:yanyana_p/core/services/live_room_chat_service.dart';
 import 'package:yanyana_p/core/services/matching_engine.dart';
 import 'package:yanyana_p/core/services/notification_service.dart';
 import 'package:yanyana_p/core/services/place_service.dart';
@@ -22,6 +24,8 @@ import 'package:yanyana_p/shared/models/chat_thread.dart';
 import 'package:yanyana_p/shared/models/community_post.dart';
 import 'package:yanyana_p/shared/models/community_room.dart';
 import 'package:yanyana_p/shared/models/emergency_request.dart';
+import 'package:yanyana_p/shared/models/live_community_room_model.dart';
+import 'package:yanyana_p/shared/models/live_room_message_model.dart';
 import 'package:yanyana_p/shared/models/notification_model.dart';
 import 'package:yanyana_p/shared/models/success_story.dart';
 import 'package:yanyana_p/shared/models/support_request.dart';
@@ -51,6 +55,9 @@ class BackendOrchestrator {
   final PlaceService placeService = PlaceService.instance;
   final SOSService sosService = SOSService.instance;
   final CommunityService communityService = CommunityService.instance;
+  final LiveCommunityRoomService liveCommunityRoomService =
+      LiveCommunityRoomService.instance;
+  final LiveRoomChatService liveRoomChatService = LiveRoomChatService.instance;
   final VolunteerService volunteerService = VolunteerService.instance;
   final SuccessStoryService successStoryService = SuccessStoryService.instance;
   final CommunityPostService communityPostService =
@@ -183,35 +190,146 @@ class BackendOrchestrator {
   }) async {
     final user = authService.currentUser;
     if (user == null) throw StateError('Oturum açmanız gerekiyor.');
-    return communityService.createRoom(
-      title: title,
+    final live = await liveCommunityRoomService.createRoom(
+      name: title,
       category: category,
       description: description,
-      createdByUid: user.id,
+      accessibilityTags: const ['Metin Sohbet'],
+      createdByUserId: user.id,
     );
+    return live.toCommunityRoom();
   }
 
   Future<void> joinCommunityRoom(String roomId) async {
     final user = authService.currentUser;
     if (user == null) throw StateError('Oturum açmanız gerekiyor.');
-    await communityService.joinRoom(roomId: roomId, uid: user.id);
+    await liveCommunityRoomService.joinRoom(roomId: roomId, userId: user.id);
+  }
+
+  Stream<List<LiveCommunityRoom>> streamLiveCommunityRooms() =>
+      liveCommunityRoomService.streamRooms();
+
+  Future<LiveCommunityRoom> createLiveCommunityRoom({
+    required String name,
+    required String description,
+    required String category,
+    required List<String> accessibilityTags,
+  }) async {
+    final user = authService.currentUser;
+    if (user == null) throw StateError('Oturum açmanız gerekiyor.');
+    return liveCommunityRoomService.createRoom(
+      name: name,
+      description: description,
+      category: category,
+      accessibilityTags: accessibilityTags,
+      createdByUserId: user.id,
+    );
+  }
+
+  Future<void> joinLiveCommunityRoom(String roomId) async {
+    final user = authService.currentUser;
+    if (user == null) throw StateError('Oturum açmanız gerekiyor.');
+    await liveCommunityRoomService.joinRoom(roomId: roomId, userId: user.id);
+  }
+
+  Future<void> updateLiveCommunityRoom({
+    required String roomId,
+    required String name,
+    required String description,
+    required String category,
+    required List<String> accessibilityTags,
+  }) async {
+    final user = authService.currentUser;
+    if (user == null) throw StateError('Oturum açmanız gerekiyor.');
+    await liveCommunityRoomService.updateRoom(
+      roomId: roomId,
+      userId: user.id,
+      name: name,
+      description: description,
+      category: category,
+      accessibilityTags: accessibilityTags,
+    );
+  }
+
+  Future<void> deleteLiveCommunityRoom(String roomId) async {
+    final user = authService.currentUser;
+    if (user == null) throw StateError('Oturum açmanız gerekiyor.');
+    await liveCommunityRoomService.deleteRoom(roomId: roomId, userId: user.id);
+  }
+
+  Future<bool> isLiveRoomJoined(String roomId) async {
+    final user = authService.currentUser;
+    if (user == null) return false;
+    return liveCommunityRoomService.isUserJoined(roomId, user.id);
   }
 
   Stream<List<CommunityRoom>> streamCommunityRooms() =>
-      communityService.streamRooms();
+      liveCommunityRoomService.streamRooms().map(
+            (rooms) => rooms.map((r) => r.toCommunityRoom()).toList(),
+          );
 
   List<CommunityRoom> getRooms() => const [];
 
   Future<List<String>> getJoinedRoomIds() async {
     final user = authService.currentUser;
     if (user == null) return const [];
-    return communityService.getJoinedRoomIds(user.id);
+    final rooms = await liveCommunityRoomService.getRooms();
+    return rooms
+        .where((r) => r.isJoinedBy(user.id))
+        .map((r) => r.id)
+        .toList();
   }
 
   Future<bool> isRoomJoined(String roomId) async {
     final user = authService.currentUser;
     if (user == null) return false;
-    return communityService.isMember(roomId, user.id);
+    return liveCommunityRoomService.isUserJoined(roomId, user.id);
+  }
+
+  Stream<List<LiveRoomMessage>> streamLiveRoomMessages(String roomId) =>
+      liveRoomChatService.streamMessages(roomId);
+
+  /// Resolves sender id/name for live room chat without crashing when auth is partial.
+  ({String id, String name}) resolveLiveRoomChatSender() {
+    final appUser = authService.currentUser;
+    if (appUser != null && appUser.id.isNotEmpty) {
+      final name = _displayNameForChat(
+        appUser.name,
+        authService.firebaseUser?.displayName,
+      );
+      return (id: appUser.id, name: name);
+    }
+
+    final fbUser = authService.firebaseUser;
+    if (fbUser != null && fbUser.uid.isNotEmpty) {
+      final name = _displayNameForChat(null, fbUser.displayName);
+      return (id: fbUser.uid, name: name);
+    }
+
+    return (id: 'guest_yanyana', name: 'YanYana User');
+  }
+
+  String _displayNameForChat(String? profileName, String? firebaseDisplayName) {
+    final fromProfile = profileName?.trim();
+    if (fromProfile != null && fromProfile.isNotEmpty) return fromProfile;
+
+    final fromFirebase = firebaseDisplayName?.trim();
+    if (fromFirebase != null && fromFirebase.isNotEmpty) return fromFirebase;
+
+    return 'YanYana User';
+  }
+
+  Future<void> sendLiveRoomMessage({
+    required String roomId,
+    required String text,
+  }) async {
+    final sender = resolveLiveRoomChatSender();
+    await liveRoomChatService.sendMessage(
+      roomId: roomId,
+      text: text,
+      senderId: sender.id,
+      senderName: sender.name,
+    );
   }
 
   Future<AccessiblePlace> addAccessiblePlace({
@@ -376,6 +494,7 @@ class BackendOrchestrator {
   Future<void> addCommunityPost({
     required String title,
     required String content,
+    String postType = 'community_post',
   }) async {
     final user = authService.currentUser;
     if (user == null) throw StateError('Oturum açmanız gerekiyor.');
@@ -384,7 +503,31 @@ class BackendOrchestrator {
       authorName: user.name,
       title: title,
       body: content,
+      postType: postType,
     );
+  }
+
+  Future<void> updateCommunityPost({
+    required String postId,
+    required String title,
+    required String content,
+    required String postType,
+  }) async {
+    final user = authService.currentUser;
+    if (user == null) throw StateError('Oturum açmanız gerekiyor.');
+    await communityPostService.updatePost(
+      postId: postId,
+      userId: user.id,
+      title: title,
+      body: content,
+      postType: postType,
+    );
+  }
+
+  Future<void> deleteCommunityPost(String postId) async {
+    final user = authService.currentUser;
+    if (user == null) throw StateError('Oturum açmanız gerekiyor.');
+    await communityPostService.deletePost(postId: postId, userId: user.id);
   }
 
   Stream<List<SuccessStory>> streamSuccessStories() =>
@@ -405,6 +548,27 @@ class BackendOrchestrator {
       title: title,
       content: content,
     );
+  }
+
+  Future<void> updateSuccessStory({
+    required String storyId,
+    required String title,
+    required String content,
+  }) async {
+    final user = authService.currentUser;
+    if (user == null) throw StateError('Oturum açmanız gerekiyor.');
+    await successStoryService.updateStory(
+      storyId: storyId,
+      userId: user.id,
+      title: title,
+      content: content,
+    );
+  }
+
+  Future<void> deleteSuccessStory(String storyId) async {
+    final user = authService.currentUser;
+    if (user == null) throw StateError('Oturum açmanız gerekiyor.');
+    await successStoryService.deleteStory(storyId: storyId, userId: user.id);
   }
 
   Future<List<TrustedContact>> getTrustedContacts() async {

@@ -34,7 +34,7 @@ class ModeratorDashboardPage extends StatelessWidget {
     final user = AuthService.instance.currentUser;
 
     return RoleGate(
-      allowedRoles: {AppAuthRole.moderator, AppAuthRole.admin},
+      allowedRoles: const {AppAuthRole.moderator, AppAuthRole.admin},
       child: Scaffold(
         backgroundColor: YanYanaColors.background,
         body: SafeArea(
@@ -64,7 +64,7 @@ class ModeratorDashboardPage extends StatelessWidget {
                       Text(
                         user?.name.isNotEmpty == true ? user!.name : 'Moderatör',
                         style: TextStyle(
-                          color: Colors.white.withOpacity(0.92),
+                          color: Colors.white.withValues(alpha: 0.92),
                           fontSize: 15,
                         ),
                       ),

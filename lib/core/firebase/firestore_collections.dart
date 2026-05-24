@@ -7,6 +7,7 @@ class FirestoreCollections {
   static const reviews = 'reviews';
   static const sosRequests = 'sos_requests';
   static const communityRooms = 'community_rooms';
+  static const messages = 'messages';
   static const members = 'members';
   static const volunteerApplications = 'volunteer_applications';
   static const successStories = 'success_stories';
