@@ -12,6 +12,9 @@ class _SafeCallPageState extends State<SafeCallPage> {
   String selectedContact = "Anne";
   String selectedNumber = "0555 111 22 33";
 
+  bool isCalling = false;
+  String statusText = "Güvenli arama sistemi beklemede.";
+
   final List<Map<String, String>> emergencyContacts = [
     {"name": "Anne", "number": "0555 111 22 33"},
     {"name": "Baba", "number": "0555 444 55 66"},
@@ -22,10 +25,18 @@ class _SafeCallPageState extends State<SafeCallPage> {
     setState(() {
       selectedContact = name;
       selectedNumber = number;
+
+      statusText = "$selectedContact kişisi seçildi.";
     });
   }
 
   void startSafeCall() {
+    setState(() {
+      isCalling = true;
+      statusText =
+          "$selectedContact ile güvenli arama bağlantısı başlatılıyor.";
+    });
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text("$selectedContact aranıyor: $selectedNumber"),
@@ -33,10 +44,29 @@ class _SafeCallPageState extends State<SafeCallPage> {
     );
   }
 
+  void stopSafeCall() {
+    setState(() {
+      isCalling = false;
+      statusText = "Güvenli arama sonlandırıldı.";
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text("Güvenli arama sonlandırıldı."),
+      ),
+    );
+  }
+
   void sendEmergencyAlert() {
+    setState(() {
+      statusText =
+          "$selectedContact kişisine acil destek bildirimi gönderildi.";
+    });
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text("$selectedContact kişisine acil destek bildirimi gönderildi."),
+        content:
+            Text("$selectedContact kişisine acil destek bildirimi gönderildi."),
       ),
     );
   }
@@ -48,23 +78,39 @@ class _SafeCallPageState extends State<SafeCallPage> {
       appBar: AppBar(
         backgroundColor: YanYanaColors.background,
         elevation: 0,
-        title: const Text("Safe Call"),
+        title: const Text(
+          "Safe Call",
+          style: TextStyle(
+            color: YanYanaColors.textDark,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        iconTheme: const IconThemeData(
+          color: YanYanaColors.textDark,
+        ),
       ),
       body: ListView(
         padding: const EdgeInsets.all(20),
         children: [
           Center(
-            child: Container(
-              width: 110,
-              height: 110,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 250),
+              width: isCalling ? 125 : 110,
+              height: isCalling ? 125 : 110,
               decoration: BoxDecoration(
-                color: YanYanaColors.primary.withValues(alpha: 0.12),
+                color: isCalling
+                    ? YanYanaColors.sos.withOpacity(0.14)
+                    : YanYanaColors.primary.withOpacity(0.12),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(
-                Icons.call_rounded,
-                size: 55,
-                color: YanYanaColors.primary,
+              child: Icon(
+                isCalling
+                    ? Icons.call_rounded
+                    : Icons.phone_enabled_rounded,
+                size: isCalling ? 60 : 55,
+                color: isCalling
+                    ? YanYanaColors.sos
+                    : YanYanaColors.primary,
               ),
             ),
           ),
@@ -116,7 +162,7 @@ class _SafeCallPageState extends State<SafeCallPage> {
                 boxShadow: YanYanaShadows.card,
                 border: Border.all(
                   color: isSelected
-                      ? YanYanaColors.primary.withValues(alpha: 0.45)
+                      ? YanYanaColors.primary.withOpacity(0.45)
                       : Colors.transparent,
                 ),
               ),
@@ -152,7 +198,43 @@ class _SafeCallPageState extends State<SafeCallPage> {
             );
           }),
 
-          const SizedBox(height: 15),
+          const SizedBox(height: 16),
+
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: YanYanaColors.primary.withOpacity(0.08),
+              borderRadius: BorderRadius.circular(22),
+              border: Border.all(
+                color: YanYanaColors.primary.withOpacity(0.15),
+              ),
+            ),
+            child: Column(
+              children: [
+                const Text(
+                  "Durum",
+                  style: TextStyle(
+                    color: YanYanaColors.textMuted,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  statusText,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: YanYanaColors.textDark,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 16),
 
           Container(
             decoration: BoxDecoration(
@@ -188,13 +270,21 @@ class _SafeCallPageState extends State<SafeCallPage> {
             height: 55,
             child: DecoratedBox(
               decoration: BoxDecoration(
-                gradient: primaryGradient,
+                gradient: isCalling ? sosGradient : primaryGradient,
                 borderRadius: BorderRadius.circular(18),
               ),
               child: ElevatedButton.icon(
-                onPressed: startSafeCall,
-                icon: const Icon(Icons.phone_rounded),
-                label: const Text("Güvenli Aramayı Başlat"),
+                onPressed: isCalling ? stopSafeCall : startSafeCall,
+                icon: Icon(
+                  isCalling
+                      ? Icons.call_end_rounded
+                      : Icons.phone_rounded,
+                ),
+                label: Text(
+                  isCalling
+                      ? "Güvenli Aramayı Sonlandır"
+                      : "Güvenli Aramayı Başlat",
+                ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.transparent,
                   shadowColor: Colors.transparent,

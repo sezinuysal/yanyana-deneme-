@@ -4,10 +4,8 @@ import 'package:yanyana_p/core/services/backend_orchestrator.dart';
 import 'package:yanyana_p/features/home/main_page.dart';
 import 'package:yanyana_p/core/theme/theme.dart';
 
-import 'package:yanyana_p/features/admin/volunteer_admin_page.dart';
 import 'package:yanyana_p/live_caption_page.dart';
 import 'package:yanyana_p/push_notification_page.dart';
-import 'package:yanyana_p/safe_call_page.dart';
 import 'package:yanyana_p/shake_help_page.dart';
 
 import 'package:yanyana_p/features/admin/admin_dashboard_page.dart';
@@ -30,94 +28,249 @@ class _AccessibilityPageState extends State<AccessibilityPage> {
   Future<void> _run(Future<void> Function() action) async {
     if (_busy) return;
 
-    setState(() => _busy = true);
+    if (mounted) {
+      setState(() => _busy = true);
+    }
 
     try {
       await action();
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(this.context).showSnackBar(
+        SnackBar(
+          content: Text(e.toString().replaceFirst('Bad state: ', '')),
+        ),
+      );
     } finally {
-      if (mounted) setState(() => _busy = false);
+      if (mounted) {
+        setState(() => _busy = false);
+      }
     }
   }
 
-  Future<void> _triggerSOS() async {
-    await _run(() async {
-      await _orchestrator.triggerSOS();
-      if (!mounted) return;
-
-      showDialog(
-        context: context,
-        builder: (_) => AlertDialog(
-          title: const Text('SOS'),
-          content: const Text('SOS isteği başarıyla oluşturuldu.'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Tamam'),
-            ),
-          ],
-        ),
-      );
-    });
+  void _goToTrustedContacts() {
+    Navigator.push<void>(
+      context,
+      MaterialPageRoute<void>(
+        builder: (_) => const TrustedContactsPage(),
+      ),
+    );
   }
 
-  Future<void> _startSafeCall() async {
-    await _run(() async {
-      final contacts = await _orchestrator.getTrustedContacts();
-      if (!mounted) return;
-      if (contacts.isEmpty) {
-        showDialog(
-          context: context,
-          builder: (_) => AlertDialog(
-            title: const Text('Güvenli Arama'),
-            content: const Text(
-              'Güvenli arama için önce güvenilir kişi eklemelisin.',
+  void _showAddTrustedContactDialog({
+    required String title,
+    required String message,
+  }) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('İptal'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(dialogContext);
+              _goToTrustedContacts();
+            },
+            child: const Text('Kişi Ekle'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _triggerSOS() async {
+    final contacts = await _orchestrator.getTrustedContacts();
+
+    if (!mounted) return;
+
+    if (contacts.isEmpty) {
+      _showAddTrustedContactDialog(
+        title: 'SOS',
+        message: 'SOS göndermek için önce güvenilir kişi eklemelisin.',
+      );
+      return;
+    }
+
+    int selectedIndex = 0;
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) {
+          final selectedContact = contacts[selectedIndex];
+
+          return AlertDialog(
+            title: const Text('SOS isteği gönderilsin mi?'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'Acil destek isteğin seçtiğin güvenilir kişiye iletilmek üzere kaydedilecek.',
+                ),
+                const SizedBox(height: 14),
+                ...List.generate(contacts.length, (index) {
+                  final contact = contacts[index];
+
+                  return RadioListTile<int>(
+                    value: index,
+                    groupValue: selectedIndex,
+                    onChanged: (value) {
+                      if (value == null) return;
+
+                      setDialogState(() {
+                        selectedIndex = value;
+                      });
+                    },
+                    title: Text(contact.name),
+                    subtitle: Text(
+                      '${contact.relationship} · ${contact.phoneNumber}',
+                    ),
+                  );
+                }),
+              ],
             ),
             actions: [
               TextButton(
-                onPressed: () => Navigator.pop(context),
+                onPressed: () => Navigator.pop(dialogContext),
                 child: const Text('İptal'),
               ),
               TextButton(
                 onPressed: () {
-                  Navigator.pop(context);
-                  Navigator.push<void>(
-                    context,
-                    MaterialPageRoute<void>(
-                      builder: (_) => const TrustedContactsPage(),
-                    ),
-                  );
+                  Navigator.pop(dialogContext);
+                  _goToTrustedContacts();
                 },
                 child: const Text('Kişi Ekle'),
               ),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(dialogContext);
+
+                  _run(() async {
+                    await _orchestrator.triggerSOS();
+
+                    if (!mounted) return;
+
+                    ScaffoldMessenger.of(this.context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          'SOS isteği ${selectedContact.name} için başarıyla oluşturuldu.',
+                        ),
+                      ),
+                    );
+                  });
+                },
+                child: const Text('Gönder'),
+              ),
             ],
-          ),
-        );
-        return;
-      }
-      await _orchestrator.startSafeCall(trustedContactId: contacts.first.id);
-      if (!mounted) return;
-      showDialog(
-        context: context,
-        builder: (_) => AlertDialog(
-          title: const Text('Güvenli Arama'),
-          content: Text(
-            'Güvenli arama isteği ${contacts.first.name} için başlatıldı.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Tamam'),
-            ),
-          ],
-        ),
+          );
+        },
+      ),
+    );
+  }
+
+  Future<void> _startSafeCall() async {
+    final contacts = await _orchestrator.getTrustedContacts();
+
+    if (!mounted) return;
+
+    if (contacts.isEmpty) {
+      _showAddTrustedContactDialog(
+        title: 'Güvenli Arama',
+        message: 'Güvenli arama için önce güvenilir kişi eklemelisin.',
       );
-    });
+      return;
+    }
+
+    int selectedIndex = 0;
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) {
+          final selectedContact = contacts[selectedIndex];
+
+          return AlertDialog(
+            title: const Text('Güvenli Arama'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'Güvenli arama, güvendiğin bir kişiye hızlıca ulaşman için tasarlanmıştır.',
+                ),
+                const SizedBox(height: 14),
+                ...List.generate(contacts.length, (index) {
+                  final contact = contacts[index];
+
+                  return RadioListTile<int>(
+                    value: index,
+                    groupValue: selectedIndex,
+                    onChanged: (value) {
+                      if (value == null) return;
+
+                      setDialogState(() {
+                        selectedIndex = value;
+                      });
+                    },
+                    title: Text(contact.name),
+                    subtitle: Text(
+                      '${contact.relationship} · ${contact.phoneNumber}',
+                    ),
+                  );
+                }),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text('İptal'),
+              ),
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(dialogContext);
+                  _goToTrustedContacts();
+                },
+                child: const Text('Kişi Ekle'),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(dialogContext);
+
+                  _run(() async {
+                    await _orchestrator.startSafeCall(
+                      trustedContactId: selectedContact.id,
+                    );
+
+                    if (!mounted) return;
+
+                    ScaffoldMessenger.of(this.context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          'Güvenli arama isteği ${selectedContact.name} için kaydedildi.',
+                        ),
+                      ),
+                    );
+                  });
+                },
+                child: const Text('Başlat'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
   }
 
   Future<void> _quickSupport() async {
     await _run(() async {
       final user = _orchestrator.getCurrentUser();
       if (user == null) return;
+
       final req = SupportRequest(
         id: 'sr_${DateTime.now().millisecondsSinceEpoch}',
         requesterName: user.name,
@@ -131,21 +284,11 @@ class _AccessibilityPageState extends State<AccessibilityPage> {
 
       if (!mounted) return;
 
-      showDialog(
-        context: context,
-        builder: (_) => AlertDialog(
-          title: const Text('Destek Talebi'),
+      ScaffoldMessenger.of(this.context).showSnackBar(
+        SnackBar(
           content: Text(
-            'Destek talebi oluşturuldu ve en uygun gönüllü eşleştirildi.\n\n'
-            'Durum: ${updated.status}\n'
-            'Gönüllü: ${updated.assignedVolunteerName ?? '-'}',
+            'Hızlı destek talebi oluşturuldu. Gönüllü: ${updated.assignedVolunteerName ?? '-'}',
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Tamam'),
-            ),
-          ],
         ),
       );
     });
@@ -206,10 +349,10 @@ class _AccessibilityPageState extends State<AccessibilityPage> {
                         const SizedBox(width: 10),
                         Expanded(
                           child: GradientButton(
-                            label: 'Güvenli Arama',
+                            label: _busy ? '...' : 'Güvenli Arama',
                             icon: Icons.call_rounded,
                             gradient: primaryGradient,
-                            onPressed: () {},
+                            onPressed: _busy ? () {} : _startSafeCall,
                             height: 52,
                           ),
                         ),
@@ -248,7 +391,8 @@ class _AccessibilityPageState extends State<AccessibilityPage> {
                     _FeatureTile(
                       icon: Icons.mic_rounded,
                       title: 'Sesli Komut Sistemi',
-                      desc: 'Kullanıcı komutlarını algılayan sesli kontrol sistemi.',
+                      desc:
+                          'Kullanıcı komutlarını algılayan sesli kontrol sistemi.',
                       badge: 'MVP',
                     ),
                     Divider(height: 18, color: YanYanaColors.divider),
@@ -275,36 +419,37 @@ class _AccessibilityPageState extends State<AccessibilityPage> {
                   ],
                 ),
               ),
-              if (_orchestrator.isAdmin) ...[
-              const SizedBox(height: 14),
 
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const AdminDashboardPage(),
+              if (_orchestrator.isAdmin) ...[
+                const SizedBox(height: 14),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const AdminDashboardPage(),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.admin_panel_settings_rounded),
+                    label: const Text(
+                      'Admin Paneli',
+                      style: TextStyle(fontWeight: FontWeight.w900),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: YanYanaColors.primary,
+                      side: const BorderSide(color: YanYanaColors.border),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(18),
                       ),
-                    );
-                  },
-                  icon: const Icon(Icons.admin_panel_settings_rounded),
-                  label: const Text(
-                    'Admin Paneli',
-                    style: TextStyle(fontWeight: FontWeight.w900),
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: YanYanaColors.primary,
-                    side: const BorderSide(color: YanYanaColors.border),
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(18),
                     ),
                   ),
                 ),
-              ),
               ],
+
               const SizedBox(height: 90),
             ],
           ),
@@ -405,9 +550,6 @@ class _FeatureTile extends StatelessWidget {
     switch (badge) {
       case 'MVP':
         badgeColor = YanYanaColors.success;
-        break;
-      case 'Future Integration':
-        badgeColor = YanYanaColors.warning;
         break;
       default:
         badgeColor = YanYanaColors.accentBlue;
