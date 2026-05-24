@@ -129,6 +129,8 @@ class ProfileService {
     String? businessLocation,
     String? businessPhone,
     List<String>? businessFacilities,
+    List<String>? badges,
+    int? points,
   }) async {
     final updateData = UserDocumentMapper.profileUpdate(
       name: name,
@@ -145,6 +147,8 @@ class ProfileService {
       businessLocation: businessLocation,
       businessPhone: businessPhone,
       businessFacilities: businessFacilities,
+      badges: badges,
+      points: points,
     );
     await _userRef(uid).update(updateData);
     final profile = await getProfile(uid);
@@ -153,6 +157,14 @@ class ProfileService {
     }
     return profile;
   }
+
+  /// Rozet ve puan alanını Firestore'da atomik günceller.
+  Future<AppUser> updateBadgesAndPoints({
+    required String uid,
+    required List<String> badges,
+    required int points,
+  }) =>
+      updateProfile(uid: uid, badges: badges, points: points);
 
   Future<void> updateEmail(String uid, String newEmail) async {
     await _userRef(uid).update({
