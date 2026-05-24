@@ -42,7 +42,7 @@ class StaffDashboardCard extends StatelessWidget {
                   width: 52,
                   height: 52,
                   decoration: BoxDecoration(
-                    color: color.withOpacity(0.14),
+                    color: color.withValues(alpha: 0.14),
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: Icon(icon, color: color, size: 28),
@@ -75,7 +75,7 @@ class StaffDashboardCard extends StatelessWidget {
                 trailing ??
                     Icon(
                       Icons.chevron_right_rounded,
-                      color: YanYanaColors.textMuted.withOpacity(0.8),
+                      color: YanYanaColors.textMuted.withValues(alpha: 0.8),
                     ),
               ],
             ),

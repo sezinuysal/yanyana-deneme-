@@ -3,7 +3,6 @@ import 'package:yanyana_p/core/constants/role_constants.dart';
 import 'package:yanyana_p/core/services/auth_service.dart';
 import 'package:yanyana_p/core/services/backend_orchestrator.dart';
 import 'package:yanyana_p/core/theme/theme.dart';
-import 'package:yanyana_p/core/utils/app_utils.dart';
 import 'package:yanyana_p/features/auth/widgets/forgot_password_dialog.dart';
 import 'package:yanyana_p/features/auth/widgets/registered_email_field.dart';
 
@@ -75,10 +74,10 @@ class _LoginPageState extends State<LoginPage>
             width: 86,
             height: 86,
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.22),
+              color: Colors.white.withValues(alpha: 0.22),
               shape: BoxShape.circle,
               border: Border.all(
-                color: Colors.white.withOpacity(0.35),
+                color: Colors.white.withValues(alpha: 0.35),
                 width: 2,
               ),
             ),
@@ -103,7 +102,7 @@ class _LoginPageState extends State<LoginPage>
             'Erişilebilir destek ve topluluk platformu',
             textAlign: TextAlign.center,
             style: TextStyle(
-              color: Colors.white.withOpacity(0.9),
+              color: Colors.white.withValues(alpha: 0.9),
               fontSize: 14,
               height: 1.4,
               fontWeight: FontWeight.w500,
@@ -160,7 +159,7 @@ class _LoginPageState extends State<LoginPage>
         'Gizlilik Politikası · Kullanım Koşulları',
         textAlign: TextAlign.center,
         style: TextStyle(
-          color: YanYanaColors.textMuted.withOpacity(0.7),
+          color: YanYanaColors.textMuted.withValues(alpha: 0.7),
           fontSize: 12,
           fontWeight: FontWeight.w500,
         ),
@@ -389,6 +388,10 @@ class _RegisterFormState extends State<_RegisterForm> {
   final _emailCtrl = TextEditingController();
   final _passCtrl = TextEditingController();
   final _confirmCtrl = TextEditingController();
+  
+  final _businessOwnerCtrl = TextEditingController();
+  final _businessLocationCtrl = TextEditingController();
+  final _businessPhoneCtrl = TextEditingController();
 
   bool _obscurePass = true;
   bool _obscureConfirm = true;
@@ -402,6 +405,9 @@ class _RegisterFormState extends State<_RegisterForm> {
     _emailCtrl.dispose();
     _passCtrl.dispose();
     _confirmCtrl.dispose();
+    _businessOwnerCtrl.dispose();
+    _businessLocationCtrl.dispose();
+    _businessPhoneCtrl.dispose();
     super.dispose();
   }
 
@@ -445,6 +451,10 @@ class _RegisterFormState extends State<_RegisterForm> {
         _emailCtrl.text.trim(),
         _passCtrl.text,
         _registerIntent,
+        businessName: _registerIntent == RegisterIntent.business ? _nameCtrl.text.trim() : null,
+        businessOwner: _registerIntent == RegisterIntent.business ? _businessOwnerCtrl.text.trim() : null,
+        businessLocation: _registerIntent == RegisterIntent.business ? _businessLocationCtrl.text.trim() : null,
+        businessPhone: _registerIntent == RegisterIntent.business ? _businessPhoneCtrl.text.trim() : null,
       );
       if (!mounted) return;
       setState(() => _loading = false);
@@ -488,6 +498,16 @@ class _RegisterFormState extends State<_RegisterForm> {
             ),
             const SizedBox(height: 8),
             _RoleChip(
+              label: 'Engelli Dostu İşletmeyim',
+              icon: Icons.storefront_rounded,
+              selected: _registerIntent == RegisterIntent.business,
+              color: YanYanaColors.sos,
+              onTap: () => setState(
+                () => _registerIntent = RegisterIntent.business,
+              ),
+            ),
+            const SizedBox(height: 8),
+            _RoleChip(
               label: 'Gönüllü olmak istiyorum',
               icon: Icons.volunteer_activism_rounded,
               selected: _registerIntent == RegisterIntent.volunteerApply,
@@ -509,16 +529,57 @@ class _RegisterFormState extends State<_RegisterForm> {
             const SizedBox(height: 16),
             YanYanaTextField(
               controller: _nameCtrl,
-              label: 'Ad Soyad',
-              hint: 'Adınızı girin',
-              icon: Icons.person_outline_rounded,
+              label: _registerIntent == RegisterIntent.business ? 'İşletme Adı' : 'Ad Soyad',
+              hint: _registerIntent == RegisterIntent.business ? 'İşletmenizin adını girin' : 'Adınızı girin',
+              icon: _registerIntent == RegisterIntent.business ? Icons.storefront_rounded : Icons.person_outline_rounded,
               validator: (v) {
                 if (v == null || v.trim().isEmpty) {
-                  return 'Ad soyad boş bırakılamaz';
+                  return _registerIntent == RegisterIntent.business ? 'İşletme adı boş bırakılamaz' : 'Ad soyad boş bırakılamaz';
                 }
                 return null;
               },
             ),
+            if (_registerIntent == RegisterIntent.business) ...[
+              const SizedBox(height: 12),
+              YanYanaTextField(
+                controller: _businessOwnerCtrl,
+                label: 'İşletme Sahibinin Adı Soyadı',
+                hint: 'İşletme sahibinin adını girin',
+                icon: Icons.person_outline_rounded,
+                validator: (v) {
+                  if (v == null || v.trim().isEmpty) {
+                    return 'İşletme sahibi boş bırakılamaz';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 12),
+              YanYanaTextField(
+                controller: _businessLocationCtrl,
+                label: 'İşletme Açık Adresi',
+                hint: 'Adresinizi girin',
+                icon: Icons.location_on_outlined,
+                validator: (v) {
+                  if (v == null || v.trim().isEmpty) {
+                    return 'Adres boş bırakılamaz';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 12),
+              YanYanaTextField(
+                controller: _businessPhoneCtrl,
+                label: 'İşletme İletişim Numarası',
+                hint: 'Telefon numaranızı girin',
+                icon: Icons.phone_outlined,
+                validator: (v) {
+                  if (v == null || v.trim().isEmpty) {
+                    return 'İletişim numarası boş bırakılamaz';
+                  }
+                  return null;
+                },
+              ),
+            ],
             const SizedBox(height: 12),
             RegisteredEmailField(controller: _emailCtrl),
             const SizedBox(height: 12),

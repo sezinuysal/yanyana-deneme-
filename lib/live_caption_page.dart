@@ -71,7 +71,7 @@ class _LiveCaptionPageState extends State<LiveCaptionPage> {
               width: 110,
               height: 110,
               decoration: BoxDecoration(
-                color: YanYanaColors.primary.withOpacity(0.12),
+                color: YanYanaColors.primary.withValues(alpha: 0.12),
                 shape: BoxShape.circle,
               ),
               child: const Icon(

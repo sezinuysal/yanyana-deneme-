@@ -58,7 +58,7 @@ class _SafeCallPageState extends State<SafeCallPage> {
               width: 110,
               height: 110,
               decoration: BoxDecoration(
-                color: YanYanaColors.primary.withOpacity(0.12),
+                color: YanYanaColors.primary.withValues(alpha: 0.12),
                 shape: BoxShape.circle,
               ),
               child: const Icon(
@@ -116,7 +116,7 @@ class _SafeCallPageState extends State<SafeCallPage> {
                 boxShadow: YanYanaShadows.card,
                 border: Border.all(
                   color: isSelected
-                      ? YanYanaColors.primary.withOpacity(0.45)
+                      ? YanYanaColors.primary.withValues(alpha: 0.45)
                       : Colors.transparent,
                 ),
               ),
@@ -150,7 +150,7 @@ class _SafeCallPageState extends State<SafeCallPage> {
                 },
               ),
             );
-          }).toList(),
+          }),
 
           const SizedBox(height: 15),
 

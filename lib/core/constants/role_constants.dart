@@ -43,6 +43,7 @@ class AppUserType {
   static const disabledUser = 'disabled_user';
   static const volunteer = 'volunteer';
   static const regularUser = 'regular_user';
+  static const business = 'business';
 
   static String label(String userType) {
     switch (normalize(userType)) {
@@ -52,6 +53,8 @@ class AppUserType {
         return 'Gönüllü';
       case regularUser:
         return 'Standart Kullanıcı';
+      case business:
+        return 'İşletme';
       default:
         return userType;
     }
@@ -62,6 +65,7 @@ class AppUserType {
       case disabledUser:
       case volunteer:
       case regularUser:
+      case business:
         return value!;
       case 'standard_user':
         return regularUser;

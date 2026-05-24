@@ -42,6 +42,10 @@ class ProfileService {
     required String provider,
     String? photoURL,
     String volunteerStatus = VolunteerStatus.none,
+    String? businessName,
+    String? businessOwner,
+    String? businessLocation,
+    String? businessPhone,
   }) async {
     final data = UserDocumentMapper.toFirestore(
       uid: uid,
@@ -51,6 +55,10 @@ class ProfileService {
       provider: provider,
       photoURL: photoURL,
       volunteerStatus: volunteerStatus,
+      businessName: businessName,
+      businessOwner: businessOwner,
+      businessLocation: businessLocation,
+      businessPhone: businessPhone,
     );
     await _userRef(uid).set(data);
   }
@@ -116,8 +124,13 @@ class ProfileService {
     List<String>? communicationPreferences,
     String? emergencyContactName,
     String? emergencyContactPhone,
+    String? businessName,
+    String? businessOwner,
+    String? businessLocation,
+    String? businessPhone,
+    List<String>? businessFacilities,
   }) async {
-    final data = UserDocumentMapper.profileUpdate(
+    final updateData = UserDocumentMapper.profileUpdate(
       name: name,
       disabilityType: disabilityType,
       about: about,
@@ -127,13 +140,25 @@ class ProfileService {
       communicationPreferences: communicationPreferences,
       emergencyContactName: emergencyContactName,
       emergencyContactPhone: emergencyContactPhone,
+      businessName: businessName,
+      businessOwner: businessOwner,
+      businessLocation: businessLocation,
+      businessPhone: businessPhone,
+      businessFacilities: businessFacilities,
     );
-    await _userRef(uid).update(data);
+    await _userRef(uid).update(updateData);
     final profile = await getProfile(uid);
     if (profile == null) {
       throw Exception('Profil güncellenemedi.');
     }
     return profile;
+  }
+
+  Future<void> updateEmail(String uid, String newEmail) async {
+    await _userRef(uid).update({
+      'email': newEmail.trim().toLowerCase(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
   }
 
   Future<AppUser> updateEmergencyContact({

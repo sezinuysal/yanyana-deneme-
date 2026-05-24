@@ -51,7 +51,7 @@ class _GuideHomeScreenState extends State<GuideHomeScreen> {
                   style: const TextStyle(fontSize: 12, color: YanYanaColors.textMuted, fontWeight: FontWeight.bold)),
                 Switch(
                   value: _isVolunteerMode,
-                  activeColor: YanYanaColors.primary,
+                  activeThumbColor: YanYanaColors.primary,
                   onChanged: (val) => setState(() => _isVolunteerMode = val),
                 ),
               ],

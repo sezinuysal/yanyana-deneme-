@@ -157,6 +157,11 @@ class BackendOrchestrator {
     List<String>? communicationPreferences,
     String? emergencyContactName,
     String? emergencyContactPhone,
+    String? businessName,
+    String? businessOwner,
+    String? businessLocation,
+    String? businessPhone,
+    List<String>? businessFacilities,
   }) async {
     final user = authService.currentUser;
     if (user == null) throw StateError('Oturum açmanız gerekiyor.');
@@ -171,6 +176,11 @@ class BackendOrchestrator {
       accessibilityNeeds: accessibilityNeeds,
       emergencyContactName: emergencyContactName,
       emergencyContactPhone: emergencyContactPhone,
+      businessName: businessName,
+      businessOwner: businessOwner,
+      businessLocation: businessLocation,
+      businessPhone: businessPhone,
+      businessFacilities: businessFacilities,
     );
     await authService.updateUser(updated);
     return updated;
@@ -337,8 +347,19 @@ class BackendOrchestrator {
       application.id,
       reviewedBy: admin?.id ?? 'admin',
     );
+    
+    await notificationService.sendNotification(
+      userId: application.userId,
+      title: 'Başvurunuz Onaylandı',
+      message: 'Tebrikler! Gönüllülük başvurunuz onaylandı.',
+    );
+    
     await authService.refreshCurrentUser();
     return updated;
+  }
+
+  Future<void> updateEmail(String newEmail) async {
+    await authService.updateEmail(newEmail);
   }
 
   Future<VolunteerApplication> rejectVolunteer(

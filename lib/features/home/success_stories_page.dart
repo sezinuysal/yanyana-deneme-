@@ -207,7 +207,7 @@ class _EmptyStories extends StatelessWidget {
             Icon(
               Icons.auto_stories_outlined,
               size: 56,
-              color: YanYanaColors.textLight.withOpacity(0.85),
+              color: YanYanaColors.textLight.withValues(alpha: 0.85),
             ),
             const SizedBox(height: 16),
             const Text(

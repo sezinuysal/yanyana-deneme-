@@ -19,18 +19,30 @@ class FirestoreNotificationService {
   Stream<List<NotificationModel>> streamForUser(String userId) {
     return _notifications
         .where('userId', isEqualTo: userId)
-        .orderBy('createdAt', descending: true)
         .snapshots()
-        .map((snap) => snap.docs.map(_fromDoc).toList());
+        .map((snap) {
+          final list = snap.docs.map(_fromDoc).toList();
+          list.sort((a, b) {
+            final ta = a.createdAt.millisecondsSinceEpoch;
+            final tb = b.createdAt.millisecondsSinceEpoch;
+            return tb.compareTo(ta);
+          });
+          return list;
+        });
   }
 
   Future<List<NotificationModel>> getForUser(String userId) async {
     try {
       final snap = await _notifications
           .where('userId', isEqualTo: userId)
-          .orderBy('createdAt', descending: true)
           .get();
-      return snap.docs.map(_fromDoc).toList();
+      final list = snap.docs.map(_fromDoc).toList();
+      list.sort((a, b) {
+        final ta = a.createdAt.millisecondsSinceEpoch;
+        final tb = b.createdAt.millisecondsSinceEpoch;
+        return tb.compareTo(ta);
+      });
+      return list;
     } catch (e) {
       throw Exception(firebaseAuthErrorMessage(e));
     }
@@ -59,6 +71,26 @@ class FirestoreNotificationService {
   Future<void> markRead(String notificationId) async {
     try {
       await _notifications.doc(notificationId).update({'isRead': true});
+    } catch (e) {
+      throw Exception(firebaseAuthErrorMessage(e));
+    }
+  }
+
+  Future<void> markAllAsRead(String userId) async {
+    try {
+      final snap = await _notifications
+          .where('userId', isEqualTo: userId)
+          .get();
+          
+      final unreadDocs = snap.docs.where((d) => d.data()['isRead'] == false).toList();
+          
+      if (unreadDocs.isEmpty) return;
+      
+      final batch = _db.batch();
+      for (final doc in unreadDocs) {
+        batch.update(doc.reference, {'isRead': true});
+      }
+      await batch.commit();
     } catch (e) {
       throw Exception(firebaseAuthErrorMessage(e));
     }

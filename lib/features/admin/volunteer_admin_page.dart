@@ -291,9 +291,9 @@ class _VolunteerAdminPageState extends State<VolunteerAdminPage> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
-                  color: statusColor.withOpacity(0.12),
+                  color: statusColor.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: statusColor.withOpacity(0.18)),
+                  border: Border.all(color: statusColor.withValues(alpha: 0.18)),
                 ),
                 child: Text(
                   app.status,
@@ -329,7 +329,7 @@ class _VolunteerAdminPageState extends State<VolunteerAdminPage> {
                   ),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: YanYanaColors.success,
-                    side: BorderSide(color: YanYanaColors.success.withOpacity(0.5)),
+                    side: BorderSide(color: YanYanaColors.success.withValues(alpha: 0.5)),
                     padding: const EdgeInsets.symmetric(vertical: 12),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(16),
@@ -348,7 +348,7 @@ class _VolunteerAdminPageState extends State<VolunteerAdminPage> {
                   ),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: YanYanaColors.sos,
-                    side: BorderSide(color: YanYanaColors.sos.withOpacity(0.5)),
+                    side: BorderSide(color: YanYanaColors.sos.withValues(alpha: 0.5)),
                     padding: const EdgeInsets.symmetric(vertical: 12),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(16),
@@ -386,7 +386,7 @@ class _VolunteerAdminPageState extends State<VolunteerAdminPage> {
                 width: 34,
                 height: 34,
                 decoration: BoxDecoration(
-                  color: color.withOpacity(0.12),
+                  color: color.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(icon, color: color, size: 19),

@@ -209,7 +209,7 @@ class _AccessibilityPageState extends State<AccessibilityPage> {
                             label: 'Güvenli Arama',
                             icon: Icons.call_rounded,
                             gradient: primaryGradient,
-                            onPressed: _openSafeCallPage,
+                            onPressed: () {},
                             height: 52,
                           ),
                         ),
@@ -336,7 +336,7 @@ class _AccessibilityPageState extends State<AccessibilityPage> {
                 width: 34,
                 height: 34,
                 decoration: BoxDecoration(
-                  color: color.withOpacity(0.12),
+                  color: color.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(icon, color: color, size: 19),
@@ -425,7 +425,7 @@ class _FeatureTile extends StatelessWidget {
               width: 42,
               height: 42,
               decoration: BoxDecoration(
-                color: badgeColor.withOpacity(0.12),
+                color: badgeColor.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(16),
               ),
               child: Icon(icon, color: badgeColor, size: 22),
@@ -453,10 +453,10 @@ class _FeatureTile extends StatelessWidget {
                           vertical: 5,
                         ),
                         decoration: BoxDecoration(
-                          color: badgeColor.withOpacity(0.12),
+                          color: badgeColor.withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(14),
                           border: Border.all(
-                            color: badgeColor.withOpacity(0.18),
+                            color: badgeColor.withValues(alpha: 0.18),
                           ),
                         ),
                         child: Text(

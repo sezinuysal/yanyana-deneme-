@@ -1,6 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:yanyana_p/core/constants/role_constants.dart';
-import 'package:yanyana_p/core/firebase/firebase_auth_errors.dart';
 import 'package:yanyana_p/core/firebase/firestore_collections.dart';
 import 'package:yanyana_p/core/firebase/firestore_utils.dart';
 import 'package:yanyana_p/shared/models/volunteer_application.dart';

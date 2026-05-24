@@ -231,7 +231,7 @@ class _CommunityPageState extends State<CommunityPage> {
                           width: 38,
                           height: 38,
                           decoration: BoxDecoration(
-                            color: YanYanaColors.primary.withOpacity(0.12),
+                            color: YanYanaColors.primary.withValues(alpha: 0.12),
                             borderRadius: BorderRadius.circular(14),
                           ),
                           child: const Icon(
@@ -277,7 +277,7 @@ class _CommunityPageState extends State<CommunityPage> {
                     ),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<String>(
-                      value: category,
+                      initialValue: category,
                       decoration: InputDecoration(
                         labelText: 'Kategori',
                         filled: true,
@@ -640,7 +640,7 @@ class _RoomCard extends StatelessWidget {
                 width: 48,
                 height: 48,
                 decoration: BoxDecoration(
-                  color: YanYanaColors.primary.withOpacity(0.12),
+                  color: YanYanaColors.primary.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(16),
                 ),
                 child: const Icon(
@@ -730,9 +730,9 @@ class _RoomCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.12),
+        color: color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: color.withOpacity(0.18)),
+        border: Border.all(color: color.withValues(alpha: 0.18)),
       ),
       child: Text(
         label,

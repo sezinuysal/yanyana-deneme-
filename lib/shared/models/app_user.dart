@@ -22,6 +22,13 @@ class AppUser {
   final String photoURL;
   final String provider;
 
+  // İşletme alanları
+  final String businessName;
+  final String businessOwner;
+  final String businessLocation;
+  final String businessPhone;
+  final List<String> businessFacilities;
+
   const AppUser({
     required this.id,
     required this.name,
@@ -42,6 +49,11 @@ class AppUser {
     this.emergencyContactPhone = '',
     this.photoURL = '',
     this.provider = 'email',
+    this.businessName = '',
+    this.businessOwner = '',
+    this.businessLocation = '',
+    this.businessPhone = '',
+    this.businessFacilities = const [],
   });
 
   bool get hasEmergencyContact =>
@@ -76,6 +88,11 @@ class AppUser {
     String? emergencyContactPhone,
     String? photoURL,
     String? provider,
+    String? businessName,
+    String? businessOwner,
+    String? businessLocation,
+    String? businessPhone,
+    List<String>? businessFacilities,
   }) {
     return AppUser(
       id: id ?? this.id,
@@ -101,6 +118,11 @@ class AppUser {
           emergencyContactPhone ?? this.emergencyContactPhone,
       photoURL: photoURL ?? this.photoURL,
       provider: provider ?? this.provider,
+      businessName: businessName ?? this.businessName,
+      businessOwner: businessOwner ?? this.businessOwner,
+      businessLocation: businessLocation ?? this.businessLocation,
+      businessPhone: businessPhone ?? this.businessPhone,
+      businessFacilities: businessFacilities ?? this.businessFacilities,
     );
   }
 }

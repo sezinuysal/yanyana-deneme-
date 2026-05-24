@@ -124,7 +124,7 @@ class _PanelHeader extends StatelessWidget {
             children: [
               Icon(
                 Icons.bookmark_rounded,
-                color: YanYanaColors.primary.withOpacity(0.85),
+                color: YanYanaColors.primary.withValues(alpha: 0.85),
                 size: 22,
               ),
               const SizedBox(width: 8),
@@ -136,7 +136,7 @@ class _PanelHeader extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 17,
                     fontWeight: FontWeight.w600,
-                    color: YanYanaColors.textDark.withOpacity(0.95),
+                    color: YanYanaColors.textDark.withValues(alpha: 0.95),
                   ),
                 ),
               ),
@@ -187,7 +187,7 @@ class PlaceListEmptyMessage extends StatelessWidget {
             Icon(
               Icons.map_outlined,
               size: 36,
-              color: YanYanaColors.textLight.withOpacity(0.7),
+              color: YanYanaColors.textLight.withValues(alpha: 0.7),
             ),
             const SizedBox(height: 10),
             const Text(
@@ -240,7 +240,7 @@ class PlaceListEmptyMessage extends StatelessWidget {
           Icon(
             Icons.search_off_rounded,
             size: 32,
-            color: YanYanaColors.textLight.withOpacity(0.8),
+            color: YanYanaColors.textLight.withValues(alpha: 0.8),
           ),
           const SizedBox(height: 8),
           const Text(
@@ -285,7 +285,7 @@ class _PlaceListTile extends StatelessWidget {
 
     return Material(
       color: selected
-          ? YanYanaColors.primaryLight.withOpacity(0.35)
+          ? YanYanaColors.primaryLight.withValues(alpha: 0.35)
           : YanYanaColors.surface,
       elevation: selected ? 0 : 0.5,
       shadowColor: Colors.black12,
@@ -298,7 +298,7 @@ class _PlaceListTile extends StatelessWidget {
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
               color: selected
-                  ? YanYanaColors.primary.withOpacity(0.4)
+                  ? YanYanaColors.primary.withValues(alpha: 0.4)
                   : YanYanaColors.border,
             ),
           ),
@@ -310,12 +310,12 @@ class _PlaceListTile extends StatelessWidget {
                 width: 38,
                 height: 38,
                 decoration: BoxDecoration(
-                  color: place.color.withOpacity(0.12),
+                  color: place.color.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Icon(
                   Icons.place_rounded,
-                  color: place.color.withOpacity(0.9),
+                  color: place.color.withValues(alpha: 0.9),
                   size: 20,
                 ),
               ),
@@ -351,7 +351,7 @@ class _PlaceListTile extends StatelessWidget {
                         Icon(
                           Icons.star_rounded,
                           size: 14,
-                          color: YanYanaColors.warning.withOpacity(0.9),
+                          color: YanYanaColors.warning.withValues(alpha: 0.9),
                         ),
                         const SizedBox(width: 2),
                         Text(

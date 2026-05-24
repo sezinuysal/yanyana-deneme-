@@ -92,7 +92,7 @@ class _MapFilterSheetState extends State<MapFilterSheet> {
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 children: [
                   DropdownButtonFormField<String>(
-                    value: _category,
+                    initialValue: _category,
                     style: const TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w500,

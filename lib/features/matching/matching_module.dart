@@ -99,7 +99,7 @@ class _MatchingModulePageState extends State<MatchingModulePage> {
               Text(
                 'Destek İste',
                 style: TextStyle(
-                  color: YanYanaColors.textMuted.withOpacity(0.95),
+                  color: YanYanaColors.textMuted.withValues(alpha: 0.95),
                   fontSize: 15,
                   height: 1.4,
                   fontWeight: FontWeight.w600,

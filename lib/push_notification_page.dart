@@ -44,7 +44,7 @@ class _PushNotificationPageState extends State<PushNotificationPage> {
               width: 110,
               height: 110,
               decoration: BoxDecoration(
-                color: YanYanaColors.primary.withOpacity(0.12),
+                color: YanYanaColors.primary.withValues(alpha: 0.12),
                 shape: BoxShape.circle,
               ),
               child: const Icon(
@@ -88,7 +88,7 @@ class _PushNotificationPageState extends State<PushNotificationPage> {
             ),
             child: SwitchListTile(
               value: permissionEnabled,
-              activeColor: YanYanaColors.primary,
+              activeThumbColor: YanYanaColors.primary,
               title: const Text(
                 "Bildirim İzni",
                 style: TextStyle(fontWeight: FontWeight.w800),
@@ -115,7 +115,7 @@ class _PushNotificationPageState extends State<PushNotificationPage> {
               boxShadow: YanYanaShadows.card,
             ),
             child: DropdownButtonFormField<String>(
-              value: selectedType,
+              initialValue: selectedType,
               decoration: InputDecoration(
                 labelText: "Bildirim Türü",
                 labelStyle: const TextStyle(

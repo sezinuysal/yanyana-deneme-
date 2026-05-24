@@ -21,6 +21,7 @@ class RegisterIntent {
   static const disabledUser = 'disabled_user';
   static const volunteerApply = 'volunteer_apply';
   static const regularUser = 'regular_user';
+  static const business = 'business';
 }
 
 /// Client-side Firebase Authentication wrapper (no custom backend).
@@ -30,7 +31,9 @@ class AuthService {
   static final AuthService instance = AuthService._();
 
   final FirebaseAuth _auth = FirebaseAuth.instance;
-  final GoogleSignIn _googleSignIn = GoogleSignIn();
+  final GoogleSignIn _googleSignIn = GoogleSignIn(
+    clientId: '618318744581-b9vnagcrp37ahpdgqc7r0o5nrjm5g3fm.apps.googleusercontent.com',
+  );
 
   AppUser? _appUser;
 
@@ -67,11 +70,16 @@ class AuthService {
         email: trimmedEmail,
         password: password,
       );
+      
+      // Senkronizasyon: Auth e-postası ile DB e-postasını eşitle
       final uid = cred.user!.uid;
-      _appUser = await ProfileService.instance.getProfile(uid);
-      if (_appUser == null) {
-        _appUser = await ProfileService.instance.ensureUserDocument(cred.user!);
+      final authEmail = cred.user!.email;
+      if (authEmail != null) {
+        await ProfileService.instance.updateEmail(uid, authEmail);
       }
+      
+      _appUser = await ProfileService.instance.getProfile(uid);
+      _appUser ??= await ProfileService.instance.ensureUserDocument(cred.user!);
       return _appUser!;
     } catch (e) {
       throw AuthException(firebaseAuthErrorMessage(e));
@@ -82,8 +90,12 @@ class AuthService {
     String fullName,
     String email,
     String password,
-    String registerIntent,
-  ) async {
+    String registerIntent, {
+    String? businessName,
+    String? businessOwner,
+    String? businessLocation,
+    String? businessPhone,
+  }) async {
     final name = fullName.trim();
     if (name.isEmpty) throw AuthException('Ad soyad boş bırakılamaz.');
     final trimmedEmail = _normalizeEmail(email);
@@ -115,6 +127,10 @@ class AuthService {
         userType: userType,
         provider: 'email',
         volunteerStatus: volunteerStatus,
+        businessName: businessName,
+        businessOwner: businessOwner,
+        businessLocation: businessLocation,
+        businessPhone: businessPhone,
       );
 
       if (registerIntent == RegisterIntent.volunteerApply) {
@@ -194,12 +210,10 @@ class AuthService {
       }
 
       _appUser = await ProfileService.instance.getProfile(fbUser.uid);
-      if (_appUser == null) {
-        _appUser = await ProfileService.instance.ensureUserDocument(
+      _appUser ??= await ProfileService.instance.ensureUserDocument(
           fbUser,
           provider: 'google',
         );
-      }
       return _appUser!;
     } catch (e) {
       throw AuthException(firebaseAuthErrorMessage(e));
@@ -224,6 +238,23 @@ class AuthService {
     }
   }
 
+  Future<void> updateEmail(String newEmail) async {
+    final user = _auth.currentUser;
+    if (user == null) throw AuthException('Oturum açılmamış.');
+    final trimmed = _normalizeEmail(newEmail);
+    if (trimmed.isEmpty) throw AuthException('E-posta boş olamaz.');
+
+    try {
+      await user.verifyBeforeUpdateEmail(trimmed);
+      
+      // Not: Firestore'u burada anında GÜNCELLEMİYORUZ. 
+      // Çünkü kullanıcı e-postasına gidip onaylamazsa, Auth ile Firestore uyuşmazlığı çıkar.
+      // Kullanıcı onayladıktan sonraki bir sonraki girişinde zaten token'dan yeni mail alınır.
+    } catch (e) {
+      throw AuthException(firebaseAuthErrorMessage(e));
+    }
+  }
+
   Future<void> signOut() async {
     if (!kIsWeb) {
       try {
@@ -238,6 +269,8 @@ class AuthService {
     switch (intent) {
       case RegisterIntent.disabledUser:
         return AppUserType.disabledUser;
+      case RegisterIntent.business:
+        return AppUserType.business;
       case RegisterIntent.volunteerApply:
         return AppUserType.regularUser;
       case RegisterIntent.regularUser:

@@ -64,7 +64,7 @@ class ModeratorDashboardPage extends StatelessWidget {
                       Text(
                         user?.name.isNotEmpty == true ? user!.name : 'Moderatör',
                         style: TextStyle(
-                          color: Colors.white.withOpacity(0.92),
+                          color: Colors.white.withValues(alpha: 0.92),
                           fontSize: 15,
                         ),
                       ),

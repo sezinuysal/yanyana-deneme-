@@ -171,7 +171,7 @@ class _TrustedContactsPageState extends State<TrustedContactsPage> {
                           Icon(
                             Icons.contact_phone_outlined,
                             size: 56,
-                            color: YanYanaColors.textLight.withOpacity(0.8),
+                            color: YanYanaColors.textLight.withValues(alpha: 0.8),
                           ),
                           const SizedBox(height: 16),
                           const Text(

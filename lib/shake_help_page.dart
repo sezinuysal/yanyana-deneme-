@@ -59,7 +59,7 @@ class _ShakeHelpPageState extends State<ShakeHelpPage> {
               width: 110,
               height: 110,
               decoration: BoxDecoration(
-                color: YanYanaColors.primary.withOpacity(0.12),
+                color: YanYanaColors.primary.withValues(alpha: 0.12),
                 shape: BoxShape.circle,
               ),
               child: const Icon(
@@ -101,7 +101,7 @@ class _ShakeHelpPageState extends State<ShakeHelpPage> {
               ),
               child: SwitchListTile(
                 value: isActivated,
-                activeColor: YanYanaColors.primary,
+                activeThumbColor: YanYanaColors.primary,
                 title: const Text(
                   "Shake Detection",
                   style: TextStyle(fontWeight: FontWeight.w800),

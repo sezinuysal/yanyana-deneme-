@@ -26,7 +26,7 @@ class MapCompactFab extends StatelessWidget {
       label: semanticLabel,
       child: Material(
         elevation: 2,
-        shadowColor: color.withOpacity(0.35),
+        shadowColor: color.withValues(alpha: 0.35),
         borderRadius: BorderRadius.circular(12),
         color: color,
         child: InkWell(

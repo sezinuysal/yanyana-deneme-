@@ -216,7 +216,7 @@ class _GuideDonationPageState extends State<GuideDonationPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 DropdownButtonFormField<String>(
-                  value: _supportType,
+                  initialValue: _supportType,
                   items: MockData.donationSupportTypes
                       .map(
                         (t) => DropdownMenuItem(
@@ -329,7 +329,7 @@ class _GuideDonationPageState extends State<GuideDonationPage> {
                 width: 34,
                 height: 34,
                 decoration: BoxDecoration(
-                  color: color.withOpacity(0.12),
+                  color: color.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(icon, color: color, size: 19),
@@ -382,9 +382,9 @@ class _GuideCardItem extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
-                  color: color.withOpacity(0.12),
+                  color: color.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: color.withOpacity(0.18)),
+                  border: Border.all(color: color.withValues(alpha: 0.18)),
                 ),
                 child: Text(
                   badge,
@@ -434,9 +434,9 @@ class _Pill extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.12),
+        color: color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: color.withOpacity(0.18)),
+        border: Border.all(color: color.withValues(alpha: 0.18)),
       ),
       child: Text(
         label,

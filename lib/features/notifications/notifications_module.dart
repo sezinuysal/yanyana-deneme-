@@ -18,7 +18,7 @@ class _NotificationsModulePageState extends State<NotificationsModulePage> {
   @override
   void initState() {
     super.initState();
-    _load();
+    BackendOrchestrator.instance.notificationService.markAllAsRead();
   }
 
   Future<void> _load() async {
@@ -38,10 +38,8 @@ class _NotificationsModulePageState extends State<NotificationsModulePage> {
     }
   }
 
-  void _toggleRead(int index) {
-    setState(() {
-      _items[index] = _items[index].copyWith(isRead: !_items[index].isRead);
-    });
+  void _toggleRead(NotificationModel n) {
+    BackendOrchestrator.instance.notificationService.markRead(n.id);
   }
 
   String _formatTime(DateTime t) {
@@ -70,121 +68,131 @@ class _NotificationsModulePageState extends State<NotificationsModulePage> {
         ),
       ),
       body: SafeArea(
-        child: _loading
-            ? const Center(child: CircularProgressIndicator())
-            : RefreshIndicator(
-                onRefresh: _load,
-                child: _items.isEmpty
-                    ? ListView(
-                        physics: const AlwaysScrollableScrollPhysics(),
-                        children: const [
-                          SizedBox(height: 100),
-                          Icon(
-                            Icons.notifications_none_rounded,
-                            size: 56,
-                            color: YanYanaColors.textLight,
+        child: StreamBuilder<List<NotificationModel>>(
+          stream: BackendOrchestrator.instance.streamNotifications(),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            if (snapshot.hasError) {
+              return const Center(child: Text('Bildirimler yüklenemedi.'));
+            }
+            final items = snapshot.data ?? [];
+
+            if (items.isEmpty) {
+              return ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                children: const [
+                  SizedBox(height: 100),
+                  Icon(
+                    Icons.notifications_none_rounded,
+                    size: 56,
+                    color: YanYanaColors.textLight,
+                  ),
+                  SizedBox(height: 16),
+                  Text(
+                    'Henüz bildirimin yok.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: YanYanaColors.textDark,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 17,
+                    ),
+                  ),
+                  SizedBox(height: 8),
+                  Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 32),
+                    child: Text(
+                      'Yeni destek, topluluk veya sistem bildirimleri burada görünecek.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: YanYanaColors.textMuted,
+                        fontSize: 14,
+                        height: 1.35,
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            }
+
+            return ListView.separated(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+              itemCount: items.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 10),
+              itemBuilder: (context, i) {
+                final n = items[i];
+                return Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(20),
+                    onTap: () => _toggleRead(n),
+                    child: Ink(
+                      decoration: BoxDecoration(
+                        color: n.isRead
+                            ? YanYanaColors.surface
+                            : YanYanaColors.primaryLight.withValues(alpha: 0.55),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: n.isRead
+                              ? YanYanaColors.border
+                              : YanYanaColors.primary,
+                        ),
+                        boxShadow: YanYanaShadows.soft,
+                      ),
+                      padding: const EdgeInsets.all(16),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Icon(
+                            Icons.notifications_rounded,
+                            color: YanYanaColors.primary,
+                            size: 28,
                           ),
-                          SizedBox(height: 16),
-                          Text(
-                            'Henüz bildirimin yok.',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              color: YanYanaColors.textDark,
-                              fontWeight: FontWeight.w900,
-                              fontSize: 17,
-                            ),
-                          ),
-                          SizedBox(height: 8),
-                          Padding(
-                            padding: EdgeInsets.symmetric(horizontal: 32),
-                            child: Text(
-                              'Yeni destek, topluluk veya sistem bildirimleri burada görünecek.',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                color: YanYanaColors.textMuted,
-                                fontSize: 14,
-                                height: 1.35,
-                              ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  n.title,
+                                  style: const TextStyle(
+                                    color: YanYanaColors.textDark,
+                                    fontWeight: FontWeight.w900,
+                                    fontSize: 16,
+                                  ),
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  n.message,
+                                  style: const TextStyle(
+                                    color: YanYanaColors.textMuted,
+                                    fontSize: 14,
+                                    height: 1.35,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  _formatTime(n.createdAt),
+                                  style: const TextStyle(
+                                    color: YanYanaColors.textLight,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ],
-                      )
-                    : ListView.separated(
-                        physics: const AlwaysScrollableScrollPhysics(),
-                        padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-                        itemCount: _items.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 10),
-                        itemBuilder: (context, i) {
-                          final n = _items[i];
-                          return Material(
-                            color: Colors.transparent,
-                            child: InkWell(
-                              borderRadius: BorderRadius.circular(20),
-                              onTap: () => _toggleRead(i),
-                              child: Ink(
-                                decoration: BoxDecoration(
-                                  color: n.isRead
-                                      ? YanYanaColors.surface
-                                      : YanYanaColors.primaryLight.withOpacity(0.55),
-                                  borderRadius: BorderRadius.circular(20),
-                                  border: Border.all(
-                                    color: n.isRead
-                                        ? YanYanaColors.border
-                                        : YanYanaColors.primary,
-                                  ),
-                                  boxShadow: YanYanaShadows.soft,
-                                ),
-                                padding: const EdgeInsets.all(16),
-                                child: Row(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const Icon(
-                                      Icons.notifications_rounded,
-                                      color: YanYanaColors.primary,
-                                      size: 28,
-                                    ),
-                                    const SizedBox(width: 14),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            n.title,
-                                            style: const TextStyle(
-                                              color: YanYanaColors.textDark,
-                                              fontWeight: FontWeight.w900,
-                                              fontSize: 16,
-                                            ),
-                                          ),
-                                          const SizedBox(height: 6),
-                                          Text(
-                                            n.message,
-                                            style: const TextStyle(
-                                              color: YanYanaColors.textMuted,
-                                              fontSize: 14,
-                                              height: 1.35,
-                                            ),
-                                          ),
-                                          const SizedBox(height: 8),
-                                          Text(
-                                            _formatTime(n.createdAt),
-                                            style: const TextStyle(
-                                              color: YanYanaColors.textLight,
-                                              fontSize: 12,
-                                              fontWeight: FontWeight.w700,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          );
-                        },
                       ),
-              ),
+                    ),
+                  ),
+                );
+              },
+            );
+          },
+        ),
       ),
     );
   }

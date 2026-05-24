@@ -61,7 +61,7 @@ class SponsorListScreen extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: tierColor.withOpacity(0.12),
+                    color: tierColor.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(sponsor.tier, style: TextStyle(color: tierColor, fontWeight: FontWeight.bold, fontSize: 12)),

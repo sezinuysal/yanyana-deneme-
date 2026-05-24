@@ -28,7 +28,7 @@ class EmergencyMapMarker extends StatelessWidget {
               borderRadius: BorderRadius.circular(8),
               boxShadow: [
                 BoxShadow(
-                  color: YanYanaColors.sos.withOpacity(0.35),
+                  color: YanYanaColors.sos.withValues(alpha: 0.35),
                   blurRadius: 6,
                   offset: const Offset(0, 2),
                 ),
@@ -49,7 +49,7 @@ class EmergencyMapMarker extends StatelessWidget {
             decoration: BoxDecoration(
               color: YanYanaColors.surface,
               borderRadius: BorderRadius.circular(6),
-              border: Border.all(color: YanYanaColors.sos.withOpacity(0.5)),
+              border: Border.all(color: YanYanaColors.sos.withValues(alpha: 0.5)),
             ),
             child: const Text(
               'Yerel MVP',

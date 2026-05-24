@@ -15,6 +15,10 @@ class UserDocumentMapper {
     String volunteerStatus = VolunteerStatus.none,
     String? photoURL,
     AppUser? existing,
+    String? businessName,
+    String? businessOwner,
+    String? businessLocation,
+    String? businessPhone,
   }) {
     final now = FieldValue.serverTimestamp();
     return {
@@ -37,6 +41,11 @@ class UserDocumentMapper {
       'badges': existing?.badges ?? const [],
       'disabilityType': existing?.disabilityType ?? '—',
       'about': existing?.about ?? '',
+      'businessName': businessName ?? existing?.businessName ?? '',
+      'businessOwner': businessOwner ?? existing?.businessOwner ?? '',
+      'businessLocation': businessLocation ?? existing?.businessLocation ?? '',
+      'businessPhone': businessPhone ?? existing?.businessPhone ?? '',
+      'businessFacilities': existing?.businessFacilities ?? const [],
       'createdAt': existing == null ? now : null,
       'updatedAt': now,
     }..removeWhere((_, v) => v == null);
@@ -78,6 +87,14 @@ class UserDocumentMapper {
       communicationPreferences: commPrefs,
       emergencyContactName: data['emergencyContactName'] as String? ?? '',
       emergencyContactPhone: data['emergencyContactPhone'] as String? ?? '',
+      businessName: data['businessName'] as String? ?? '',
+      businessOwner: data['businessOwner'] as String? ?? '',
+      businessLocation: data['businessLocation'] as String? ?? '',
+      businessPhone: data['businessPhone'] as String? ?? '',
+      businessFacilities: (data['businessFacilities'] as List<dynamic>?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          const [],
     );
   }
 
@@ -91,6 +108,11 @@ class UserDocumentMapper {
     List<String>? communicationPreferences,
     String? emergencyContactName,
     String? emergencyContactPhone,
+    String? businessName,
+    String? businessOwner,
+    String? businessLocation,
+    String? businessPhone,
+    List<String>? businessFacilities,
   }) {
     final map = <String, dynamic>{
       'updatedAt': FieldValue.serverTimestamp(),
@@ -111,6 +133,13 @@ class UserDocumentMapper {
     }
     if (emergencyContactPhone != null) {
       map['emergencyContactPhone'] = emergencyContactPhone;
+    }
+    if (businessName != null) map['businessName'] = businessName;
+    if (businessOwner != null) map['businessOwner'] = businessOwner;
+    if (businessLocation != null) map['businessLocation'] = businessLocation;
+    if (businessPhone != null) map['businessPhone'] = businessPhone;
+    if (businessFacilities != null) {
+      map['businessFacilities'] = businessFacilities;
     }
     return map;
   }

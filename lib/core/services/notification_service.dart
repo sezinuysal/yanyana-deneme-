@@ -35,4 +35,26 @@ class NotificationService {
       message: message,
     );
   }
+
+  Future<void> sendNotification({
+    required String userId,
+    required String title,
+    required String message,
+  }) async {
+    await _firestore.add(
+      userId: userId,
+      title: title,
+      message: message,
+    );
+  }
+
+  Future<void> markRead(String notificationId) async {
+    await _firestore.markRead(notificationId);
+  }
+
+  Future<void> markAllAsRead() async {
+    final user = authService.currentUser;
+    if (user == null) return;
+    await _firestore.markAllAsRead(user.id);
+  }
 }

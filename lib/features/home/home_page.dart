@@ -404,6 +404,7 @@ class _HomePageState extends State<HomePage> {
     final user = _user ?? _backend.currentUser;
     final firstName = _firstName(user);
     final recommended = _recommendedActions(user);
+    final unreadCount = _notifications.where((n) => !n.isRead).length;
 
     return Scaffold(
       backgroundColor: HomePalette.background,
@@ -417,7 +418,7 @@ class _HomePageState extends State<HomePage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildTopBar(),
+                _buildTopBar(unreadCount),
                 const SizedBox(height: 14),
                 _GreetingCard(
                   firstName: firstName,
@@ -529,7 +530,7 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _buildTopBar() {
+  Widget _buildTopBar(int unreadCount) {
     return Row(
       children: [
         Container(
@@ -563,12 +564,18 @@ class _HomePageState extends State<HomePage> {
           child: InkWell(
             borderRadius: BorderRadius.circular(14),
             onTap: _openNotifications,
-            child: const SizedBox(
+            child: SizedBox(
               width: 44,
               height: 44,
-              child: Icon(
-                Icons.notifications_rounded,
-                color: HomePalette.primary,
+              child: Center(
+                child: Badge(
+                  isLabelVisible: unreadCount > 0,
+                  label: Text('$unreadCount'),
+                  child: const Icon(
+                    Icons.notifications_rounded,
+                    color: HomePalette.primary,
+                  ),
+                ),
               ),
             ),
           ),
@@ -634,7 +641,7 @@ class _GreetingCard extends StatelessWidget {
               width: 72,
               height: 72,
               decoration: BoxDecoration(
-                color: HomePalette.primary.withOpacity(0.08),
+                color: HomePalette.primary.withValues(alpha: 0.08),
                 shape: BoxShape.circle,
               ),
             ),
@@ -646,7 +653,7 @@ class _GreetingCard extends StatelessWidget {
               width: 56,
               height: 56,
               decoration: BoxDecoration(
-                color: const Color(0xFF14B8A6).withOpacity(0.1),
+                color: const Color(0xFF14B8A6).withValues(alpha: 0.1),
                 shape: BoxShape.circle,
               ),
             ),
@@ -735,7 +742,7 @@ class _StatusChip extends StatelessWidget {
       decoration: BoxDecoration(
         color: color,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withOpacity(0.7)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.7)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -775,7 +782,7 @@ class _EmergencyCard extends StatelessWidget {
       decoration: BoxDecoration(
         gradient: HomePalette.emergencyGradient,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: HomePalette.softPink.withOpacity(0.8)),
+        border: Border.all(color: HomePalette.softPink.withValues(alpha: 0.8)),
         boxShadow: YanYanaShadows.soft,
       ),
       child: Column(
@@ -787,7 +794,7 @@ class _EmergencyCard extends StatelessWidget {
                 width: 48,
                 height: 48,
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.85),
+                  color: Colors.white.withValues(alpha: 0.85),
                   borderRadius: BorderRadius.circular(16),
                 ),
                 child: const Icon(
@@ -832,7 +839,7 @@ class _EmergencyCard extends StatelessWidget {
                   child: OutlinedButton.icon(
                     onPressed: onSafeCall,
                     style: OutlinedButton.styleFrom(
-                      backgroundColor: Colors.white.withOpacity(0.85),
+                      backgroundColor: Colors.white.withValues(alpha: 0.85),
                       foregroundColor: HomePalette.textDark,
                       side: const BorderSide(color: Color(0xFFFFD6DE)),
                       shape: RoundedRectangleBorder(
@@ -909,7 +916,7 @@ class _RecommendedCard extends StatelessWidget {
           decoration: BoxDecoration(
             color: action.background,
             borderRadius: BorderRadius.circular(22),
-            border: Border.all(color: Colors.white.withOpacity(0.8)),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.8)),
             boxShadow: YanYanaShadows.soft,
           ),
           child: Row(
@@ -918,7 +925,7 @@ class _RecommendedCard extends StatelessWidget {
                 width: 48,
                 height: 48,
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.75),
+                  color: Colors.white.withValues(alpha: 0.75),
                   borderRadius: BorderRadius.circular(16),
                 ),
                 child: Icon(action.icon, color: action.iconColor, size: 26),
@@ -951,7 +958,7 @@ class _RecommendedCard extends StatelessWidget {
               Icon(
                 Icons.arrow_forward_ios_rounded,
                 size: 16,
-                color: action.iconColor.withOpacity(0.8),
+                color: action.iconColor.withValues(alpha: 0.8),
               ),
             ],
           ),
@@ -1132,7 +1139,7 @@ class _PastelEmptyCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: background,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.white.withOpacity(0.9)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.9)),
         boxShadow: YanYanaShadows.soft,
       ),
       child: Column(
@@ -1141,7 +1148,7 @@ class _PastelEmptyCard extends StatelessWidget {
             width: 56,
             height: 56,
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.75),
+              color: Colors.white.withValues(alpha: 0.75),
               shape: BoxShape.circle,
             ),
             child: Icon(icon, color: iconColor, size: 30),
@@ -1213,7 +1220,7 @@ class _CommunityPreviewCard extends StatelessWidget {
             decoration: BoxDecoration(
               color: HomePalette.softMint,
               borderRadius: BorderRadius.circular(22),
-              border: Border.all(color: Colors.white.withOpacity(0.9)),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.9)),
               boxShadow: YanYanaShadows.soft,
             ),
             child: Column(
@@ -1276,7 +1283,7 @@ class _StoryPreviewCard extends StatelessWidget {
             decoration: BoxDecoration(
               color: HomePalette.softYellow,
               borderRadius: BorderRadius.circular(22),
-              border: Border.all(color: Colors.white.withOpacity(0.9)),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.9)),
               boxShadow: YanYanaShadows.soft,
             ),
             child: Column(

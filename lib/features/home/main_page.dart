@@ -64,8 +64,8 @@ class _MainPageState extends State<MainPage> {
               height: 62,
               backgroundColor: Colors.transparent,
               indicatorColor: HomePalette.lavender,
-              labelTextStyle: MaterialStateProperty.resolveWith((states) {
-                final selected = states.contains(MaterialState.selected);
+              labelTextStyle: WidgetStateProperty.resolveWith((states) {
+                final selected = states.contains(WidgetState.selected);
                 return TextStyle(
                   fontSize: 11,
                   fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
@@ -74,8 +74,8 @@ class _MainPageState extends State<MainPage> {
                       : HomePalette.textMuted,
                 );
               }),
-              iconTheme: MaterialStateProperty.resolveWith((states) {
-                final selected = states.contains(MaterialState.selected);
+              iconTheme: WidgetStateProperty.resolveWith((states) {
+                final selected = states.contains(WidgetState.selected);
                 return IconThemeData(
                   size: 22,
                   color: selected

@@ -11,6 +11,8 @@ import 'package:yanyana_p/features/home/main_page.dart';
 import 'package:yanyana_p/features/home/trusted_contacts_page.dart';
 import 'package:yanyana_p/shared/models/app_user.dart';
 import 'package:yanyana_p/shared/models/volunteer_application.dart';
+import 'package:speech_to_text/speech_to_text.dart' as stt;
+import 'package:flutter_tts/flutter_tts.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -22,59 +24,15 @@ class ProfilePage extends StatefulWidget {
 class _ProfilePageState extends State<ProfilePage> {
   final _backend = BackendOrchestrator.instance;
 
-  final _nameCtrl = TextEditingController();
-  final _aboutCtrl = TextEditingController();
-  final _voiceCtrl = TextEditingController();
-  final _interestsCtrl = TextEditingController();
-  final _emergencyNameCtrl = TextEditingController();
-  final _emergencyPhoneCtrl = TextEditingController();
-
   AppUser? _user;
   VolunteerApplication? _volunteerApp;
   bool _loading = true;
-  bool _saving = false;
   String? _loadError;
-
-  String _snapshotName = '';
-  String _snapshotAbout = '';
-  String _snapshotVoice = '';
-  String _snapshotInterests = '';
-  String _snapshotEmergencyName = '';
-  String _snapshotEmergencyPhone = '';
-  final Set<String> _selectedComm = {};
-  final Set<String> _selectedAccess = {};
-  Set<String> _snapshotComm = {};
-  Set<String> _snapshotAccess = {};
-
-  static const _commOptions = [
-    'Yazılı iletişim',
-    'Sesli iletişim',
-    'Yavaş ve net iletişim',
-    'Görsel destek',
-  ];
-  static const _accessOptions = [
-    'Görme desteği',
-    'İşitme desteği',
-    'Hareket desteği',
-    'Görünmez engel',
-    'Acil destek ihtiyacı',
-  ];
 
   @override
   void initState() {
     super.initState();
     _load();
-  }
-
-  @override
-  void dispose() {
-    _nameCtrl.dispose();
-    _aboutCtrl.dispose();
-    _voiceCtrl.dispose();
-    _interestsCtrl.dispose();
-    _emergencyNameCtrl.dispose();
-    _emergencyPhoneCtrl.dispose();
-    super.dispose();
   }
 
   Future<void> _load() async {
@@ -91,12 +49,11 @@ class _ProfilePageState extends State<ProfilePage> {
         });
         return;
       }
-      final user = await ProfileService.instance.getProfile(uid) ??
-          _backend.currentUser;
+      final user = await ProfileService.instance.getProfile(uid) ?? _backend.currentUser;
       final volunteerApp = await _backend.getMyVolunteerApplication();
       if (!mounted) return;
-      _applyUser(user);
       setState(() {
+        _user = user;
         _volunteerApp = volunteerApp;
         _loading = false;
       });
@@ -106,60 +63,12 @@ class _ProfilePageState extends State<ProfilePage> {
         _loadError = e.toString();
         _loading = false;
         _user = _backend.currentUser;
-        if (_user != null) _applyUser(_user);
       });
     }
   }
 
-  void _applyUser(AppUser? user) {
-    _user = user;
-    if (user == null) return;
-    _nameCtrl.text = user.name;
-    _aboutCtrl.text = user.about;
-    _voiceCtrl.text = user.voiceIntro;
-    _interestsCtrl.text = user.interests.join(', ');
-    _emergencyNameCtrl.text = user.emergencyContactName;
-    _emergencyPhoneCtrl.text = user.emergencyContactPhone;
-    _selectedComm
-      ..clear()
-      ..addAll(
-        user.communicationPreferences.isEmpty &&
-                user.communicationPreference.isNotEmpty
-            ? [user.communicationPreference]
-            : user.communicationPreferences,
-      );
-    _selectedAccess
-      ..clear()
-      ..addAll(user.accessibilityNeeds);
-    _takeSnapshot();
-  }
-
-  void _takeSnapshot() {
-    _snapshotName = _nameCtrl.text;
-    _snapshotAbout = _aboutCtrl.text;
-    _snapshotVoice = _voiceCtrl.text;
-    _snapshotInterests = _interestsCtrl.text;
-    _snapshotEmergencyName = _emergencyNameCtrl.text;
-    _snapshotEmergencyPhone = _emergencyPhoneCtrl.text;
-    _snapshotComm = Set<String>.from(_selectedComm);
-    _snapshotAccess = Set<String>.from(_selectedAccess);
-  }
-
-  bool get _hasChanges {
-    if (_user == null) return false;
-    return _nameCtrl.text != _snapshotName ||
-        _aboutCtrl.text != _snapshotAbout ||
-        _voiceCtrl.text != _snapshotVoice ||
-        _interestsCtrl.text != _snapshotInterests ||
-        _emergencyNameCtrl.text != _snapshotEmergencyName ||
-        _emergencyPhoneCtrl.text != _snapshotEmergencyPhone ||
-        !_setEquals(_selectedComm, _snapshotComm) ||
-        !_setEquals(_selectedAccess, _snapshotAccess);
-  }
-
-  bool _setEquals(Set<String> a, Set<String> b) {
-    if (a.length != b.length) return false;
-    return a.containsAll(b);
+  void _onUserSaved(AppUser updatedUser) {
+    setState(() => _user = updatedUser);
   }
 
   double _profileCompletion(AppUser user) {
@@ -176,45 +85,6 @@ class _ProfilePageState extends State<ProfilePage> {
     if (user.accessibilityNeeds.isNotEmpty) filled++;
     if (user.hasEmergencyContact) filled++;
     return filled / total;
-  }
-
-  Future<void> _save() async {
-    if (_user == null || !_hasChanges) return;
-    setState(() => _saving = true);
-    try {
-      final updated = await _backend.updateProfile(
-        name: _nameCtrl.text,
-        about: _aboutCtrl.text,
-        voiceIntro: _voiceCtrl.text,
-        interests: _interestsCtrl.text
-            .split(',')
-            .map((e) => e.trim())
-            .where((e) => e.isNotEmpty)
-            .toList(),
-        accessibilityNeeds: _selectedAccess.toList(),
-        communicationPreferences: _selectedComm.toList(),
-        emergencyContactName: _emergencyNameCtrl.text.trim(),
-        emergencyContactPhone: _emergencyPhoneCtrl.text.trim(),
-      );
-      if (!mounted) return;
-      setState(() {
-        _user = updated;
-        _saving = false;
-      });
-      _takeSnapshot();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Profil güncellendi.')),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _saving = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Profil kaydedilemedi: $e'),
-          backgroundColor: YanYanaColors.sos,
-        ),
-      );
-    }
   }
 
   Future<void> _logout() async {
@@ -288,273 +158,150 @@ class _ProfilePageState extends State<ProfilePage> {
     return Scaffold(
       backgroundColor: YanYanaColors.background,
       body: SafeArea(
-        child: Column(
-          children: [
-            Expanded(
-              child: RefreshIndicator(
-                onRefresh: _load,
-                child: SingleChildScrollView(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      const Text(
-                        'Profil',
-                        style: TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.w800,
-                          color: YanYanaColors.textDark,
-                        ),
-                      ),
-                      if (_loadError != null) ...[
-                        const SizedBox(height: 8),
-                        Text(
-                          'Bazı alanlar önbellekten yüklendi.',
-                          style: TextStyle(
-                            color: YanYanaColors.warning.withOpacity(0.9),
-                            fontSize: 13,
-                          ),
-                        ),
-                      ],
-                      const SizedBox(height: 16),
-                      _ProfileHeaderCard(
-                        user: user,
-                        completion: _profileCompletion(user),
-                      ),
-                      const SizedBox(height: 14),
-                      _SectionCard(
-                        title: 'Kişisel bilgiler',
-                        icon: Icons.person_outline_rounded,
-                        child: Column(
-                          children: [
-                            _ProfileField(
-                              label: 'Ad Soyad',
-                              controller: _nameCtrl,
-                              onChanged: (_) => setState(() {}),
-                            ),
-                            const SizedBox(height: 12),
-                            _ProfileField(
-                              label: 'Hakkında',
-                              controller: _aboutCtrl,
-                              maxLines: 3,
-                              hint: 'Kendinizi kısaca tanıtın',
-                              onChanged: (_) => setState(() {}),
-                            ),
-                            const SizedBox(height: 12),
-                            _ProfileField(
-                              label: 'Sesli tanıtım metni',
-                              controller: _voiceCtrl,
-                              maxLines: 2,
-                              hint: 'Sesli tanıtım için kısa metin',
-                              onChanged: (_) => setState(() {}),
-                            ),
-                            const SizedBox(height: 12),
-                            _ProfileField(
-                              label: 'İlgi alanları',
-                              controller: _interestsCtrl,
-                              hint: 'Virgülle ayırın (ör. müzik, spor)',
-                              onChanged: (_) => setState(() {}),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 14),
-                      _SectionCard(
-                        title: 'Erişilebilirlik tercihleri',
-                        icon: Icons.accessibility_new_rounded,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const _SubsectionLabel('İletişim tercihleri'),
-                            const SizedBox(height: 8),
-                            _PreferenceChips(
-                              options: _commOptions,
-                              selected: _selectedComm,
-                              onChanged: (next) => setState(() {
-                                _selectedComm
-                                  ..clear()
-                                  ..addAll(next);
-                              }),
-                            ),
-                            const SizedBox(height: 16),
-                            const _SubsectionLabel('Erişilebilirlik ihtiyaçları'),
-                            const SizedBox(height: 8),
-                            _PreferenceChips(
-                              options: _accessOptions,
-                              selected: _selectedAccess,
-                              onChanged: (next) => setState(() {
-                                _selectedAccess
-                                  ..clear()
-                                  ..addAll(next);
-                              }),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 14),
-                      _SectionCard(
-                        title: 'Acil durum kişisi',
-                        icon: Icons.emergency_rounded,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'SOS ve güvenli arama bu bilgiyi kullanır.',
-                              style: TextStyle(
-                                color: YanYanaColors.textMuted,
-                                fontSize: 13,
-                                height: 1.35,
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-                            if (user.hasEmergencyContact &&
-                                _emergencyNameCtrl.text.trim().isNotEmpty)
-                              _EmergencyContactPreview(
-                                name: _emergencyNameCtrl.text.trim(),
-                                phone: _emergencyPhoneCtrl.text.trim(),
-                              ),
-                            if (!user.hasEmergencyContact &&
-                                _emergencyNameCtrl.text.trim().isEmpty)
-                              const Padding(
-                                padding: EdgeInsets.only(bottom: 12),
-                                child: Text(
-                                  'Henüz acil durum kişisi eklenmedi.',
-                                  style: TextStyle(
-                                    color: YanYanaColors.textMuted,
-                                    fontSize: 14,
-                                  ),
-                                ),
-                              ),
-                            _ProfileField(
-                              label: 'Acil kişi adı',
-                              controller: _emergencyNameCtrl,
-                              hint: 'Örn. Ayşe Yılmaz',
-                              onChanged: (_) => setState(() {}),
-                            ),
-                            const SizedBox(height: 12),
-                            _ProfileField(
-                              label: 'Acil kişi telefon',
-                              controller: _emergencyPhoneCtrl,
-                              keyboardType: TextInputType.phone,
-                              hint: '05xx xxx xx xx',
-                              onChanged: (_) => setState(() {}),
-                            ),
-                            const SizedBox(height: 8),
-                            Align(
-                              alignment: Alignment.centerRight,
-                              child: TextButton.icon(
-                                onPressed: () => Navigator.push<void>(
-                                  context,
-                                  MaterialPageRoute<void>(
-                                    builder: (_) => const TrustedContactsPage(),
-                                  ),
-                                ).then((_) => _load()),
-                                icon: const Icon(Icons.contact_phone_outlined, size: 18),
-                                label: const Text('Güvenilir kişileri yönet'),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 14),
-                      _VolunteerCard(
-                        user: user,
-                        application: _volunteerApp,
-                        onApply: () async {
-                          try {
-                            final app = await _backend.submitVolunteerApplication(
-                              supportArea: 'Genel destek',
-                            );
-                            if (!mounted) return;
-                            setState(() => _volunteerApp = app);
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Gönüllü başvurunuz alındı.'),
-                              ),
-                            );
-                          } catch (e) {
-                            if (!mounted) return;
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text(e.toString())),
-                            );
-                          }
-                        },
-                        onEDevlet: () => showFutureFeatureDialog(
-                          context,
-                          title: 'e-Devlet doğrulama',
-                          message:
-                              'e-Devlet doğrulama gelecek sürümde eklenecektir. Şu an aktif değildir.',
-                        ),
-                      ),
-                      if (user.isAdmin) ...[
-                        const SizedBox(height: 14),
-                        _SectionCard(
-                          title: 'Yönetim',
-                          icon: Icons.admin_panel_settings_outlined,
-                          child: ListTile(
-                            contentPadding: EdgeInsets.zero,
-                            leading: const Icon(Icons.dashboard_customize_outlined),
-                            title: const Text('Admin Paneli'),
-                            subtitle: const Text('Gönüllü başvuruları ve kullanıcı yönetimi'),
-                            trailing: const Icon(Icons.chevron_right_rounded),
-                            onTap: () => Navigator.push<void>(
-                              context,
-                              MaterialPageRoute<void>(
-                                builder: (_) => const AdminDashboardPage(),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                      if (user.isModerator && !user.isAdmin) ...[
-                        const SizedBox(height: 14),
-                        _SectionCard(
-                          title: 'Moderasyon',
-                          icon: Icons.shield_outlined,
-                          child: ListTile(
-                            contentPadding: EdgeInsets.zero,
-                            leading: const Icon(Icons.forum_outlined),
-                            title: const Text('Moderatör Paneli'),
-                            subtitle: const Text('Topluluk moderasyon araçları'),
-                            trailing: const Icon(Icons.chevron_right_rounded),
-                            onTap: () => Navigator.push<void>(
-                              context,
-                              MaterialPageRoute<void>(
-                                builder: (_) => const ModeratorDashboardPage(),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                      const SizedBox(height: 14),
-                      _AccountActionsCard(onLogout: _logout),
-                      SizedBox(height: MainPage.bottomContentPadding * 0.35),
-                    ],
+        child: RefreshIndicator(
+          onRefresh: _load,
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Text(
+                  'Profil',
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w800,
+                    color: YanYanaColors.textDark,
                   ),
                 ),
-              ),
+                if (_loadError != null) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    'Bazı alanlar önbellekten yüklendi.',
+                    style: TextStyle(
+                      color: YanYanaColors.warning.withValues(alpha: 0.9),
+                      fontSize: 13,
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 16),
+                _ProfileHeaderCard(
+                  user: user,
+                  completion: _profileCompletion(user),
+                  onRefresh: _load,
+                ),
+                const SizedBox(height: 14),
+
+                if (user.userType == AppUserType.business) ...[
+                  _BusinessInfoSection(user: user, onSaved: _onUserSaved),
+                  const SizedBox(height: 14),
+                  _BusinessFacilitiesSection(user: user, onSaved: _onUserSaved),
+                  const SizedBox(height: 14),
+                ] else ...[
+                  _PersonalInfoSection(user: user, onSaved: _onUserSaved),
+                  const SizedBox(height: 14),
+                  if (user.userType == AppUserType.disabledUser) ...[
+                    _AccessibilitySection(user: user, onSaved: _onUserSaved),
+                    const SizedBox(height: 14),
+                  ],
+                  _EmergencyContactSection(user: user, onSaved: _onUserSaved, onManage: _load),
+                  const SizedBox(height: 14),
+                  _VolunteerCard(
+                    user: user,
+                    application: _volunteerApp,
+                    onApply: () async {
+                      try {
+                        final app = await _backend.submitVolunteerApplication(
+                          supportArea: 'Genel destek',
+                        );
+                        if (!mounted) return;
+                        setState(() => _volunteerApp = app);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Gönüllü başvurunuz alındı.'),
+                          ),
+                        );
+                      } catch (e) {
+                        if (!mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text(e.toString())),
+                        );
+                      }
+                    },
+                  ),
+                ],
+
+                if (user.isAdmin) ...[
+                  const SizedBox(height: 14),
+                  _SectionCard(
+                    title: 'Yönetim',
+                    icon: Icons.admin_panel_settings_outlined,
+                    child: ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: const Icon(Icons.dashboard_customize_outlined),
+                      title: const Text('Admin Paneli'),
+                      subtitle: const Text('Gönüllü başvuruları ve kullanıcı yönetimi'),
+                      trailing: const Icon(Icons.chevron_right_rounded),
+                      onTap: () => Navigator.push<void>(
+                        context,
+                        MaterialPageRoute<void>(
+                          builder: (_) => const AdminDashboardPage(),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+                if (user.isModerator && !user.isAdmin) ...[
+                  const SizedBox(height: 14),
+                  _SectionCard(
+                    title: 'Moderasyon',
+                    icon: Icons.shield_outlined,
+                    child: ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: const Icon(Icons.forum_outlined),
+                      title: const Text('Moderatör Paneli'),
+                      subtitle: const Text('Topluluk moderasyon araçları'),
+                      trailing: const Icon(Icons.chevron_right_rounded),
+                      onTap: () => Navigator.push<void>(
+                        context,
+                        MaterialPageRoute<void>(
+                          builder: (_) => const ModeratorDashboardPage(),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 14),
+                _AccountActionsCard(onLogout: _logout),
+                SizedBox(height: MainPage.bottomContentPadding * 0.35),
+              ],
             ),
-            _SaveBar(
-              hasChanges: _hasChanges,
-              saving: _saving,
-              onSave: _save,
-            ),
-          ],
+          ),
         ),
       ),
     );
   }
 }
 
-class _ProfileHeaderCard extends StatelessWidget {
+class _ProfileHeaderCard extends StatefulWidget {
   final AppUser user;
   final double completion;
+  final VoidCallback onRefresh;
 
-  const _ProfileHeaderCard({required this.user, required this.completion});
+  const _ProfileHeaderCard({
+    required this.user,
+    required this.completion,
+    required this.onRefresh,
+  });
+
+  @override
+  State<_ProfileHeaderCard> createState() => _ProfileHeaderCardState();
+}
+
+class _ProfileHeaderCardState extends State<_ProfileHeaderCard> {
 
   String get _initials {
-    final parts = user.name.trim().split(RegExp(r'\s+'));
+    final parts = widget.user.name.trim().split(RegExp(r'\s+'));
     if (parts.isEmpty || parts.first.isEmpty) return '?';
     if (parts.length == 1) return parts.first[0].toUpperCase();
     return '${parts.first[0]}${parts.last[0]}'.toUpperCase();
@@ -562,7 +309,7 @@ class _ProfileHeaderCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final hasPhoto = user.photoURL.trim().isNotEmpty;
+    final hasPhoto = widget.user.photoURL.trim().isNotEmpty;
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -577,7 +324,7 @@ class _ProfileHeaderCard extends StatelessWidget {
             radius: 40,
             backgroundColor: Colors.white24,
             backgroundImage:
-                hasPhoto ? NetworkImage(user.photoURL) : null,
+                hasPhoto ? NetworkImage(widget.user.photoURL) : null,
             onBackgroundImageError: hasPhoto ? (_, __) {} : null,
             child: hasPhoto
                 ? null
@@ -592,7 +339,7 @@ class _ProfileHeaderCard extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           Text(
-            user.name.isEmpty ? 'İsimsiz kullanıcı' : user.name,
+            widget.user.name.isEmpty ? 'İsimsiz kullanıcı' : widget.user.name,
             textAlign: TextAlign.center,
             style: const TextStyle(
               color: Colors.white,
@@ -602,20 +349,20 @@ class _ProfileHeaderCard extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            user.email,
+            widget.user.email,
             textAlign: TextAlign.center,
             style: TextStyle(
-              color: Colors.white.withOpacity(0.92),
+              color: Colors.white.withValues(alpha: 0.92),
               fontSize: 14,
             ),
           ),
           const SizedBox(height: 10),
-          RoleBadgesRow(user: user, lightOnGradient: true),
+          RoleBadgesRow(user: widget.user, lightOnGradient: true),
           const SizedBox(height: 14),
           ClipRRect(
             borderRadius: BorderRadius.circular(8),
             child: LinearProgressIndicator(
-              value: completion.clamp(0.0, 1.0),
+              value: widget.completion.clamp(0.0, 1.0),
               minHeight: 6,
               backgroundColor: Colors.white24,
               valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
@@ -623,9 +370,9 @@ class _ProfileHeaderCard extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            'Profil tamamlanma: ${(completion * 100).round()}%',
+            'Profil tamamlanma: ${(widget.completion * 100).round()}%',
             style: TextStyle(
-              color: Colors.white.withOpacity(0.9),
+              color: Colors.white.withValues(alpha: 0.9),
               fontSize: 12,
               fontWeight: FontWeight.w600,
             ),
@@ -640,11 +387,13 @@ class _SectionCard extends StatelessWidget {
   final String title;
   final IconData icon;
   final Widget child;
+  final Widget? trailing;
 
   const _SectionCard({
     required this.title,
     required this.icon,
     required this.child,
+    this.trailing,
   });
 
   @override
@@ -664,14 +413,17 @@ class _SectionCard extends StatelessWidget {
             children: [
               Icon(icon, size: 22, color: YanYanaColors.primary),
               const SizedBox(width: 8),
-              Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w800,
-                  color: YanYanaColors.textDark,
+              Expanded(
+                child: Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: YanYanaColors.textDark,
+                  ),
                 ),
               ),
+              if (trailing != null) trailing!,
             ],
           ),
           const SizedBox(height: 14),
@@ -706,6 +458,7 @@ class _ProfileField extends StatelessWidget {
   final String? hint;
   final TextInputType keyboardType;
   final ValueChanged<String>? onChanged;
+  final bool enabled;
 
   const _ProfileField({
     required this.label,
@@ -714,34 +467,77 @@ class _ProfileField extends StatelessWidget {
     this.hint,
     this.keyboardType = TextInputType.text,
     this.onChanged,
+    this.enabled = true,
   });
 
   @override
   Widget build(BuildContext context) {
-    return TextField(
-      controller: controller,
-      maxLines: maxLines,
-      keyboardType: keyboardType,
-      onChanged: onChanged,
-      style: const TextStyle(
-        fontSize: 15,
-        fontWeight: FontWeight.w500,
-        color: YanYanaColors.textDark,
-      ),
-      decoration: InputDecoration(
-        labelText: label,
-        hintText: hint,
-        filled: true,
-        fillColor: YanYanaColors.surfaceSoft,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: YanYanaColors.border),
+    if (!enabled) {
+      final value = controller.text.trim();
+      return Container(
+        width: double.infinity,
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+        decoration: BoxDecoration(
+          color: YanYanaColors.surfaceSoft.withValues(alpha: 0.6),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: YanYanaColors.border.withValues(alpha: 0.5)),
         ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: YanYanaColors.primary, width: 1.5),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: YanYanaColors.textMuted,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              value.isEmpty ? '-' : value,
+              style: const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: YanYanaColors.textDark,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: TextField(
+        controller: controller,
+        maxLines: maxLines,
+        keyboardType: keyboardType,
+        onChanged: onChanged,
+        style: const TextStyle(
+          fontSize: 15,
+          fontWeight: FontWeight.w600,
+          color: YanYanaColors.textDark,
+        ),
+        decoration: InputDecoration(
+          labelText: label,
+          hintText: hint,
+          filled: true,
+          fillColor: YanYanaColors.surfaceSoft,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: const BorderSide(color: YanYanaColors.border),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: const BorderSide(color: YanYanaColors.border),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: const BorderSide(color: YanYanaColors.primary, width: 2),
+          ),
         ),
       ),
     );
@@ -752,15 +548,43 @@ class _PreferenceChips extends StatelessWidget {
   final List<String> options;
   final Set<String> selected;
   final ValueChanged<Set<String>> onChanged;
+  final bool enabled;
 
   const _PreferenceChips({
     required this.options,
     required this.selected,
     required this.onChanged,
+    this.enabled = true,
   });
 
   @override
   Widget build(BuildContext context) {
+    if (!enabled) {
+      if (selected.isEmpty) {
+        return const Text(
+          'Belirtilmemiş',
+          style: TextStyle(color: YanYanaColors.textMuted, fontSize: 14),
+        );
+      }
+      return Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: selected.map((label) => Chip(
+          label: Text(
+            label,
+            style: const TextStyle(
+              fontWeight: FontWeight.w700,
+              fontSize: 13,
+              color: YanYanaColors.primary,
+            ),
+          ),
+          backgroundColor: YanYanaColors.primaryLight.withValues(alpha: 0.3),
+          side: BorderSide.none,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        )).toList(),
+      );
+    }
+
     return Wrap(
       spacing: 8,
       runSpacing: 8,
@@ -776,14 +600,15 @@ class _PreferenceChips extends StatelessWidget {
             showCheckmark: false,
             labelStyle: TextStyle(
               fontWeight: FontWeight.w600,
-              fontSize: 13,
+              fontSize: 14,
               color: on ? Colors.white : YanYanaColors.textDark,
             ),
             selectedColor: YanYanaColors.primary,
-            backgroundColor: YanYanaColors.surface,
+            backgroundColor: YanYanaColors.surfaceSoft,
             side: BorderSide(
               color: on ? YanYanaColors.primary : YanYanaColors.border,
             ),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             onSelected: (v) {
               final next = Set<String>.from(selected);
               if (v) {
@@ -813,9 +638,9 @@ class _EmergencyContactPreview extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: YanYanaColors.primaryLight.withOpacity(0.45),
+        color: YanYanaColors.primaryLight.withValues(alpha: 0.45),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: YanYanaColors.primary.withOpacity(0.25)),
+        border: Border.all(color: YanYanaColors.primary.withValues(alpha: 0.25)),
       ),
       child: Row(
         children: [
@@ -852,13 +677,11 @@ class _VolunteerCard extends StatelessWidget {
   final AppUser user;
   final VolunteerApplication? application;
   final VoidCallback onApply;
-  final VoidCallback onEDevlet;
 
   const _VolunteerCard({
     required this.user,
     required this.application,
     required this.onApply,
-    required this.onEDevlet,
   });
 
   String _statusLabel(String status) => VolunteerStatus.label(status).isNotEmpty
@@ -906,23 +729,6 @@ class _VolunteerCard extends StatelessWidget {
                 label: const Text('Gönüllü olmak istiyorum'),
               ),
             ),
-          const SizedBox(height: 12),
-          OutlinedButton.icon(
-            onPressed: onEDevlet,
-            icon: const Icon(Icons.verified_user_outlined, size: 20),
-            label: const Text('e-Devlet doğrulama'),
-            style: OutlinedButton.styleFrom(
-              minimumSize: const Size(double.infinity, 44),
-            ),
-          ),
-          const SizedBox(height: 6),
-          const Text(
-            'Gelecek sürümde planlandı.',
-            style: TextStyle(
-              color: YanYanaColors.textMuted,
-              fontSize: 12,
-            ),
-          ),
         ],
       ),
     );
@@ -957,7 +763,7 @@ class _AccountActionsCard extends StatelessWidget {
             ),
             style: OutlinedButton.styleFrom(
               side: const BorderSide(color: YanYanaColors.sosLight),
-              backgroundColor: YanYanaColors.sosLight.withOpacity(0.35),
+              backgroundColor: YanYanaColors.sosLight.withValues(alpha: 0.35),
             ),
           ),
         ),
@@ -966,65 +772,846 @@ class _AccountActionsCard extends StatelessWidget {
   }
 }
 
-class _SaveBar extends StatelessWidget {
-  final bool hasChanges;
-  final bool saving;
-  final VoidCallback onSave;
+// =======================================================================
+// Section Widgets
+// =======================================================================
 
-  const _SaveBar({
-    required this.hasChanges,
-    required this.saving,
-    required this.onSave,
-  });
+class _PersonalInfoSection extends StatefulWidget {
+  final AppUser user;
+  final ValueChanged<AppUser> onSaved;
+
+  const _PersonalInfoSection({required this.user, required this.onSaved});
+
+  @override
+  State<_PersonalInfoSection> createState() => _PersonalInfoSectionState();
+}
+
+class _PersonalInfoSectionState extends State<_PersonalInfoSection> {
+  bool _isEditing = false;
+  bool _isSaving = false;
+
+  late TextEditingController _nameCtrl;
+  late TextEditingController _aboutCtrl;
+  late TextEditingController _interestsCtrl;
+
+  late stt.SpeechToText _speech;
+  late FlutterTts _tts;
+  bool _isListening = false;
+  bool _isPlaying = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _speech = stt.SpeechToText();
+    _tts = FlutterTts();
+    _initControllers();
+  }
+
+  @override
+  void didUpdateWidget(_PersonalInfoSection old) {
+    super.didUpdateWidget(old);
+    if (!_isEditing && old.user != widget.user) {
+      _initControllers();
+    }
+  }
+
+  void _initControllers() {
+    _nameCtrl = TextEditingController(text: widget.user.name);
+    _aboutCtrl = TextEditingController(text: widget.user.about);
+    _interestsCtrl = TextEditingController(text: widget.user.interests.join(', '));
+  }
+
+  @override
+  void dispose() {
+    _nameCtrl.dispose();
+    _aboutCtrl.dispose();
+    _interestsCtrl.dispose();
+    _tts.stop();
+    super.dispose();
+  }
+
+  String _preListenText = '';
+
+  Future<void> _listenToAbout() async {
+    if (_isPlaying) {
+      await _tts.stop();
+      setState(() => _isPlaying = false);
+    }
+    
+    if (!_isListening) {
+      final available = await _speech.initialize(
+        onStatus: (val) {
+          debugPrint('onStatus: $val');
+          if (val == 'notListening' || val == 'done') {
+            if (mounted) setState(() => _isListening = false);
+          }
+        },
+        onError: (val) => debugPrint('onError: $val'),
+      );
+      if (available) {
+        setState(() {
+          _isListening = true;
+          _preListenText = _aboutCtrl.text.trim();
+        });
+        _speech.listen(
+          onResult: (val) => setState(() {
+            final newWords = val.recognizedWords.trim();
+            if (_preListenText.isEmpty) {
+              _aboutCtrl.text = newWords;
+            } else {
+              _aboutCtrl.text = '$_preListenText $newWords'.trim();
+            }
+          }),
+          localeId: 'tr_TR',
+        );
+      }
+    } else {
+      setState(() => _isListening = false);
+      _speech.stop();
+    }
+  }
+
+  Future<void> _speakAbout() async {
+    if (_isListening) {
+      _speech.stop();
+      setState(() => _isListening = false);
+    }
+    if (_isPlaying) {
+      await _tts.stop();
+      setState(() => _isPlaying = false);
+      return;
+    }
+    final text = _aboutCtrl.text.trim();
+    if (text.isEmpty) return;
+    
+    setState(() => _isPlaying = true);
+    await _tts.setLanguage("tr-TR");
+    await _tts.setSpeechRate(0.5);
+    
+    _tts.setCompletionHandler(() {
+      if (mounted) setState(() => _isPlaying = false);
+    });
+    
+    await _tts.speak(text);
+  }
+
+  Future<void> _save() async {
+    setState(() => _isSaving = true);
+    try {
+      final updated = await BackendOrchestrator.instance.updateProfile(
+        name: _nameCtrl.text.trim(),
+        about: _aboutCtrl.text.trim(),
+        voiceIntro: widget.user.voiceIntro, // Mevcut değeri koru veya boş bırakabiliriz
+        interests: _interestsCtrl.text
+            .split(',')
+            .map((e) => e.trim())
+            .where((e) => e.isNotEmpty)
+            .toList(),
+      );
+      if (mounted) {
+        widget.onSaved(updated);
+        setState(() {
+          _isEditing = false;
+          _isSaving = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Kişisel bilgiler güncellendi.')));
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isSaving = false);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Hata: $e'), backgroundColor: YanYanaColors.sos));
+      }
+    }
+  }
+
+  void _cancel() {
+    setState(() {
+      _initControllers();
+      _isEditing = false;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      elevation: 8,
-      color: YanYanaColors.surface,
-      child: SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
-          child: Semantics(
-            button: true,
-            label: 'Profil güncelle',
-            enabled: hasChanges && !saving,
-            child: SizedBox(
-              width: double.infinity,
-              height: 48,
-              child: FilledButton(
-                onPressed: (!hasChanges || saving) ? null : onSave,
-                style: FilledButton.styleFrom(
-                  backgroundColor: YanYanaColors.primary,
-                  disabledBackgroundColor: YanYanaColors.surfaceSoft,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
+    return _SectionCard(
+      title: 'Kişisel bilgiler',
+      icon: Icons.person_outline_rounded,
+      trailing: _isEditing
+          ? null
+          : IconButton(
+              icon: const Icon(Icons.edit, color: YanYanaColors.primary, size: 20),
+              onPressed: () => setState(() => _isEditing = true),
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
+            ),
+      child: Column(
+        children: [
+          _ProfileField(
+            label: 'Ad Soyad',
+            controller: _nameCtrl,
+            enabled: _isEditing,
+          ),
+          const SizedBox(height: 12),
+          Stack(
+            alignment: Alignment.bottomRight,
+            children: [
+              _ProfileField(
+                label: 'Hakkında',
+                controller: _aboutCtrl,
+                maxLines: 3,
+                hint: 'Kendinizi kısaca tanıtın',
+                enabled: _isEditing,
+              ),
+              if (_isEditing)
+                Positioned(
+                  bottom: 8,
+                  right: 8,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (_aboutCtrl.text.isNotEmpty)
+                        IconButton(
+                          icon: const Icon(Icons.delete_outline, color: YanYanaColors.sos),
+                          onPressed: () => setState(() {
+                            _aboutCtrl.clear();
+                            _preListenText = '';
+                          }),
+                          tooltip: 'Metni temizle',
+                        ),
+                      IconButton(
+                        icon: Icon(
+                          _isListening ? Icons.mic : Icons.mic_none,
+                          color: _isListening ? YanYanaColors.sos : YanYanaColors.primary,
+                        ),
+                        onPressed: _listenToAbout,
+                        tooltip: 'Sesle yazdır',
+                      ),
+                    ],
+                  ),
+                )
+              else if (_aboutCtrl.text.trim().isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: IconButton(
+                    icon: Icon(
+                      _isPlaying ? Icons.stop_circle : Icons.play_circle,
+                      color: YanYanaColors.primary,
+                      size: 28,
+                    ),
+                    onPressed: _speakAbout,
+                    tooltip: 'Sesli oku',
                   ),
                 ),
-                child: saving
-                    ? const SizedBox(
-                        width: 22,
-                        height: 22,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                        ),
-                      )
-                    : Text(
-                        'Değişiklikleri Kaydet',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 15,
-                          color: hasChanges
-                              ? Colors.white
-                              : YanYanaColors.textMuted,
-                        ),
-                      ),
-              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          _ProfileField(
+            label: 'İlgi alanları',
+            controller: _interestsCtrl,
+            hint: 'Virgülle ayırın (ör. müzik, spor)',
+            enabled: _isEditing,
+          ),
+          if (_isEditing) ...[
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(
+                  onPressed: _isSaving ? null : _cancel,
+                  child: const Text('İptal'),
+                ),
+                const SizedBox(width: 8),
+                FilledButton(
+                  onPressed: _isSaving ? null : _save,
+                  child: _isSaving
+                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      : const Text('Kaydet'),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _AccessibilitySection extends StatefulWidget {
+  final AppUser user;
+  final ValueChanged<AppUser> onSaved;
+
+  const _AccessibilitySection({required this.user, required this.onSaved});
+
+  @override
+  State<_AccessibilitySection> createState() => _AccessibilitySectionState();
+}
+
+class _AccessibilitySectionState extends State<_AccessibilitySection> {
+  bool _isEditing = false;
+  bool _isSaving = false;
+
+  late Set<String> _selectedComm;
+  late Set<String> _selectedAccess;
+
+  static const _commOptions = [
+    'Yazılı iletişim',
+    'Sesli iletişim',
+    'Yavaş ve net iletişim',
+    'Görsel destek',
+  ];
+  static const _accessOptions = [
+    'Görme desteği',
+    'İşitme desteği',
+    'Hareket desteği',
+    'Görünmez engel',
+    'Acil destek ihtiyacı',
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _initData();
+  }
+
+  @override
+  void didUpdateWidget(_AccessibilitySection old) {
+    super.didUpdateWidget(old);
+    if (!_isEditing && old.user != widget.user) {
+      _initData();
+    }
+  }
+
+  void _initData() {
+    _selectedComm = {
+      if (widget.user.communicationPreferences.isEmpty && widget.user.communicationPreference.isNotEmpty)
+        widget.user.communicationPreference
+      else
+        ...widget.user.communicationPreferences
+    };
+    _selectedAccess = {...widget.user.accessibilityNeeds};
+  }
+
+  Future<void> _save() async {
+    setState(() => _isSaving = true);
+    try {
+      final updated = await BackendOrchestrator.instance.updateProfile(
+        communicationPreferences: _selectedComm.toList(),
+        accessibilityNeeds: _selectedAccess.toList(),
+      );
+      if (mounted) {
+        widget.onSaved(updated);
+        setState(() {
+          _isEditing = false;
+          _isSaving = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Erişilebilirlik güncellendi.')));
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isSaving = false);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Hata: $e'), backgroundColor: YanYanaColors.sos));
+      }
+    }
+  }
+
+  void _cancel() {
+    setState(() {
+      _initData();
+      _isEditing = false;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return _SectionCard(
+      title: 'Erişilebilirlik tercihleri',
+      icon: Icons.accessibility_new_rounded,
+      trailing: _isEditing
+          ? null
+          : IconButton(
+              icon: const Icon(Icons.edit, color: YanYanaColors.primary, size: 20),
+              onPressed: () => setState(() => _isEditing = true),
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
+            ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const _SubsectionLabel('İletişim tercihleri'),
+          const SizedBox(height: 8),
+          _PreferenceChips(
+            options: _commOptions,
+            selected: _selectedComm,
+            enabled: _isEditing,
+            onChanged: (next) => setState(() {
+              _selectedComm
+                ..clear()
+                ..addAll(next);
+            }),
+          ),
+          const SizedBox(height: 16),
+          const _SubsectionLabel('Erişilebilirlik ihtiyaçları'),
+          const SizedBox(height: 8),
+          _PreferenceChips(
+            options: _accessOptions,
+            selected: _selectedAccess,
+            enabled: _isEditing,
+            onChanged: (next) => setState(() {
+              _selectedAccess
+                ..clear()
+                ..addAll(next);
+            }),
+          ),
+          if (_isEditing) ...[
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(
+                  onPressed: _isSaving ? null : _cancel,
+                  child: const Text('İptal'),
+                ),
+                const SizedBox(width: 8),
+                FilledButton(
+                  onPressed: _isSaving ? null : _save,
+                  child: _isSaving
+                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      : const Text('Kaydet'),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _EmergencyContactSection extends StatefulWidget {
+  final AppUser user;
+  final ValueChanged<AppUser> onSaved;
+  final VoidCallback onManage;
+
+  const _EmergencyContactSection({required this.user, required this.onSaved, required this.onManage});
+
+  @override
+  State<_EmergencyContactSection> createState() => _EmergencyContactSectionState();
+}
+
+class _EmergencyContactSectionState extends State<_EmergencyContactSection> {
+  bool _isEditing = false;
+  bool _isSaving = false;
+
+  late TextEditingController _emergencyNameCtrl;
+  late TextEditingController _emergencyPhoneCtrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _initControllers();
+  }
+
+  @override
+  void didUpdateWidget(_EmergencyContactSection old) {
+    super.didUpdateWidget(old);
+    if (!_isEditing && old.user != widget.user) {
+      _initControllers();
+    }
+  }
+
+  void _initControllers() {
+    _emergencyNameCtrl = TextEditingController(text: widget.user.emergencyContactName);
+    _emergencyPhoneCtrl = TextEditingController(text: widget.user.emergencyContactPhone);
+  }
+
+  @override
+  void dispose() {
+    _emergencyNameCtrl.dispose();
+    _emergencyPhoneCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    setState(() => _isSaving = true);
+    try {
+      final updated = await BackendOrchestrator.instance.updateProfile(
+        emergencyContactName: _emergencyNameCtrl.text.trim(),
+        emergencyContactPhone: _emergencyPhoneCtrl.text.trim(),
+      );
+      if (mounted) {
+        widget.onSaved(updated);
+        setState(() {
+          _isEditing = false;
+          _isSaving = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Acil durum kişisi güncellendi.')));
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isSaving = false);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Hata: $e'), backgroundColor: YanYanaColors.sos));
+      }
+    }
+  }
+
+  void _cancel() {
+    setState(() {
+      _initControllers();
+      _isEditing = false;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return _SectionCard(
+      title: 'Acil durum kişisi',
+      icon: Icons.emergency_rounded,
+      trailing: _isEditing
+          ? null
+          : IconButton(
+              icon: const Icon(Icons.edit, color: YanYanaColors.primary, size: 20),
+              onPressed: () => setState(() => _isEditing = true),
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
+            ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'SOS ve güvenli arama bu bilgiyi kullanır.',
+            style: TextStyle(
+              color: YanYanaColors.textMuted,
+              fontSize: 13,
+              height: 1.35,
             ),
           ),
-        ),
+          const SizedBox(height: 12),
+          if (!widget.user.hasEmergencyContact &&
+              !_isEditing &&
+              widget.user.emergencyContactName.trim().isEmpty)
+            const Padding(
+              padding: EdgeInsets.only(bottom: 12),
+              child: Text(
+                'Henüz acil durum kişisi eklenmedi.',
+                style: TextStyle(
+                  color: YanYanaColors.textMuted,
+                  fontSize: 14,
+                ),
+              ),
+            ),
+          _ProfileField(
+            label: 'Acil kişi adı',
+            controller: _emergencyNameCtrl,
+            hint: 'Örn. Ayşe Yılmaz',
+            enabled: _isEditing,
+          ),
+          const SizedBox(height: 12),
+          _ProfileField(
+            label: 'Acil kişi telefon',
+            controller: _emergencyPhoneCtrl,
+            keyboardType: TextInputType.phone,
+            hint: '05xx xxx xx xx',
+            enabled: _isEditing,
+          ),
+          const SizedBox(height: 8),
+          if (_isEditing) ...[
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(
+                  onPressed: _isSaving ? null : _cancel,
+                  child: const Text('İptal'),
+                ),
+                const SizedBox(width: 8),
+                FilledButton(
+                  onPressed: _isSaving ? null : _save,
+                  child: _isSaving
+                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      : const Text('Kaydet'),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _BusinessInfoSection extends StatefulWidget {
+  final AppUser user;
+  final ValueChanged<AppUser> onSaved;
+
+  const _BusinessInfoSection({required this.user, required this.onSaved});
+
+  @override
+  State<_BusinessInfoSection> createState() => _BusinessInfoSectionState();
+}
+
+class _BusinessInfoSectionState extends State<_BusinessInfoSection> {
+  bool _isEditing = false;
+  bool _isSaving = false;
+
+  late TextEditingController _nameCtrl;
+  late TextEditingController _ownerCtrl;
+  late TextEditingController _locationCtrl;
+  late TextEditingController _phoneCtrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _initControllers();
+  }
+
+  @override
+  void didUpdateWidget(_BusinessInfoSection old) {
+    super.didUpdateWidget(old);
+    if (!_isEditing && old.user != widget.user) {
+      _initControllers();
+    }
+  }
+
+  void _initControllers() {
+    _nameCtrl = TextEditingController(text: widget.user.businessName);
+    _ownerCtrl = TextEditingController(text: widget.user.businessOwner);
+    _locationCtrl = TextEditingController(text: widget.user.businessLocation);
+    _phoneCtrl = TextEditingController(text: widget.user.businessPhone);
+  }
+
+  @override
+  void dispose() {
+    _nameCtrl.dispose();
+    _ownerCtrl.dispose();
+    _locationCtrl.dispose();
+    _phoneCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    setState(() => _isSaving = true);
+    try {
+      final updated = await BackendOrchestrator.instance.updateProfile(
+        businessName: _nameCtrl.text.trim(),
+        businessOwner: _ownerCtrl.text.trim(),
+        businessLocation: _locationCtrl.text.trim(),
+        businessPhone: _phoneCtrl.text.trim(),
+      );
+      if (mounted) {
+        widget.onSaved(updated);
+        setState(() {
+          _isEditing = false;
+          _isSaving = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('İşletme bilgileri güncellendi.')));
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isSaving = false);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Hata: $e'), backgroundColor: YanYanaColors.sos));
+      }
+    }
+  }
+
+  void _cancel() {
+    setState(() {
+      _initControllers();
+      _isEditing = false;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return _SectionCard(
+      title: 'İşletme Bilgileri',
+      icon: Icons.storefront_rounded,
+      trailing: _isEditing
+          ? null
+          : IconButton(
+              icon: const Icon(Icons.edit, color: YanYanaColors.primary, size: 20),
+              onPressed: () => setState(() => _isEditing = true),
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
+            ),
+      child: Column(
+        children: [
+          _ProfileField(
+            label: 'İşletme Adı',
+            controller: _nameCtrl,
+            enabled: _isEditing,
+          ),
+          const SizedBox(height: 12),
+          _ProfileField(
+            label: 'İşletme Sahibi',
+            controller: _ownerCtrl,
+            enabled: _isEditing,
+          ),
+          const SizedBox(height: 12),
+          _ProfileField(
+            label: 'Açık Adres / Konum',
+            controller: _locationCtrl,
+            maxLines: 3,
+            enabled: _isEditing,
+          ),
+          const SizedBox(height: 12),
+          _ProfileField(
+            label: 'İşletme İletişim Numarası',
+            controller: _phoneCtrl,
+            enabled: _isEditing,
+          ),
+          if (_isEditing) ...[
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(
+                  onPressed: _isSaving ? null : _cancel,
+                  child: const Text('İptal'),
+                ),
+                const SizedBox(width: 8),
+                FilledButton(
+                  onPressed: _isSaving ? null : _save,
+                  child: _isSaving
+                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      : const Text('Kaydet'),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _BusinessFacilitiesSection extends StatefulWidget {
+  final AppUser user;
+  final ValueChanged<AppUser> onSaved;
+
+  const _BusinessFacilitiesSection({required this.user, required this.onSaved});
+
+  @override
+  State<_BusinessFacilitiesSection> createState() => _BusinessFacilitiesSectionState();
+}
+
+class _BusinessFacilitiesSectionState extends State<_BusinessFacilitiesSection> {
+  bool _isEditing = false;
+  bool _isSaving = false;
+
+  late Set<String> _selectedFacilities;
+
+  static const _facilityOptions = [
+    'Tekerlekli Sandalye Rampası',
+    'Asansör',
+    'Engelli Tuvaleti',
+    'Braille Menü / Yönlendirme',
+    'İşaret Dili Bilen Personel',
+    'Geniş Kapı/Geçiş',
+    'Sessiz Alan',
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _initData();
+  }
+
+  @override
+  void didUpdateWidget(_BusinessFacilitiesSection old) {
+    super.didUpdateWidget(old);
+    if (!_isEditing && old.user != widget.user) {
+      _initData();
+    }
+  }
+
+  void _initData() {
+    _selectedFacilities = {...widget.user.businessFacilities};
+  }
+
+  Future<void> _save() async {
+    setState(() => _isSaving = true);
+    try {
+      final updated = await BackendOrchestrator.instance.updateProfile(
+        businessFacilities: _selectedFacilities.toList(),
+      );
+      if (mounted) {
+        widget.onSaved(updated);
+        setState(() {
+          _isEditing = false;
+          _isSaving = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Erişilebilirlik imkanları güncellendi.')));
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isSaving = false);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Hata: $e'), backgroundColor: YanYanaColors.sos));
+      }
+    }
+  }
+
+  void _cancel() {
+    setState(() {
+      _initData();
+      _isEditing = false;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return _SectionCard(
+      title: 'Sunduğunuz Erişilebilirlik İmkanları',
+      icon: Icons.accessible_forward_rounded,
+      trailing: _isEditing
+          ? null
+          : IconButton(
+              icon: const Icon(Icons.edit, color: YanYanaColors.primary, size: 20),
+              onPressed: () => setState(() => _isEditing = true),
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
+            ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'İşletmenizin sahip olduğu imkanları seçin. Bu bilgiler haritada engelli bireyler için görünürlüğünüzü artırır.',
+            style: TextStyle(
+              color: YanYanaColors.textMuted,
+              fontSize: 13,
+              height: 1.35,
+            ),
+          ),
+          const SizedBox(height: 12),
+          _PreferenceChips(
+            options: _facilityOptions,
+            selected: _selectedFacilities,
+            enabled: _isEditing,
+            onChanged: (next) => setState(() {
+              _selectedFacilities
+                ..clear()
+                ..addAll(next);
+            }),
+          ),
+          if (_isEditing) ...[
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(
+                  onPressed: _isSaving ? null : _cancel,
+                  child: const Text('İptal'),
+                ),
+                const SizedBox(width: 8),
+                FilledButton(
+                  onPressed: _isSaving ? null : _save,
+                  child: _isSaving
+                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      : const Text('Kaydet'),
+                ),
+              ],
+            ),
+          ],
+        ],
       ),
     );
   }

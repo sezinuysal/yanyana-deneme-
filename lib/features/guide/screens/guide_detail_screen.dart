@@ -79,7 +79,7 @@ class _GuideDetailScreenState extends State<GuideDetailScreen> {
                       margin: const EdgeInsets.only(bottom: 16),
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: YanYanaColors.warning.withOpacity(0.1),
+                        color: YanYanaColors.warning.withValues(alpha: 0.1),
                         border: Border.all(color: YanYanaColors.warning, width: 1.5),
                         borderRadius: BorderRadius.circular(16),
                       ),
@@ -178,7 +178,7 @@ class _GuideDetailScreenState extends State<GuideDetailScreen> {
       decoration: BoxDecoration(
         color: step.isCompleted ? YanYanaColors.surfaceSoft : YanYanaColors.surface,
         borderRadius: BorderRadius.circular(20),
-        border: step.isCompleted ? Border.all(color: YanYanaColors.success.withOpacity(0.5), width: 2) : Border.all(color: Colors.transparent, width: 2),
+        border: step.isCompleted ? Border.all(color: YanYanaColors.success.withValues(alpha: 0.5), width: 2) : Border.all(color: Colors.transparent, width: 2),
         boxShadow: step.isCompleted ? [] : YanYanaShadows.soft,
       ),
       child: Padding(
