@@ -48,6 +48,8 @@ dependencies:
   google_sign_in: ^6.2.1
   http: ^1.2.2
   shared_preferences: ^2.5.5
+  flutter_local_notifications: 17.2.4
+  timezone: 0.9.0
 dev_dependencies:
   flutter_test:
     sdk: flutter
