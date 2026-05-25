@@ -25,7 +25,6 @@ class _SafeCallPageState extends State<SafeCallPage> {
     setState(() {
       selectedContact = name;
       selectedNumber = number;
-
       statusText = "$selectedContact kişisi seçildi.";
     });
   }
@@ -33,8 +32,7 @@ class _SafeCallPageState extends State<SafeCallPage> {
   void startSafeCall() {
     setState(() {
       isCalling = true;
-      statusText =
-          "$selectedContact ile güvenli arama bağlantısı başlatılıyor.";
+      statusText = "$selectedContact ile güvenli arama bağlantısı başlatılıyor.";
     });
 
     ScaffoldMessenger.of(context).showSnackBar(
@@ -59,14 +57,12 @@ class _SafeCallPageState extends State<SafeCallPage> {
 
   void sendEmergencyAlert() {
     setState(() {
-      statusText =
-          "$selectedContact kişisine acil destek bildirimi gönderildi.";
+      statusText = "$selectedContact kişisine acil destek bildirimi gönderildi.";
     });
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content:
-            Text("$selectedContact kişisine acil destek bildirimi gönderildi."),
+        content: Text("$selectedContact kişisine acil destek bildirimi gönderildi."),
       ),
     );
   }
@@ -104,13 +100,9 @@ class _SafeCallPageState extends State<SafeCallPage> {
                 shape: BoxShape.circle,
               ),
               child: Icon(
-                isCalling
-                    ? Icons.call_rounded
-                    : Icons.phone_enabled_rounded,
+                isCalling ? Icons.call_rounded : Icons.phone_enabled_rounded,
                 size: isCalling ? 60 : 55,
-                color: isCalling
-                    ? YanYanaColors.sos
-                    : YanYanaColors.primary,
+                color: isCalling ? YanYanaColors.sos : YanYanaColors.primary,
               ),
             ),
           ),
@@ -230,6 +222,16 @@ class _SafeCallPageState extends State<SafeCallPage> {
                     fontWeight: FontWeight.w800,
                   ),
                 ),
+                const SizedBox(height: 10),
+                const Text(
+                  "Prototype demo: Gerçek telefon araması yerine güvenli iletişim akışı simüle edilmektedir.",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: YanYanaColors.textMuted,
+                    fontSize: 11.5,
+                    height: 1.35,
+                  ),
+                ),
               ],
             ),
           ),
@@ -276,9 +278,7 @@ class _SafeCallPageState extends State<SafeCallPage> {
               child: ElevatedButton.icon(
                 onPressed: isCalling ? stopSafeCall : startSafeCall,
                 icon: Icon(
-                  isCalling
-                      ? Icons.call_end_rounded
-                      : Icons.phone_rounded,
+                  isCalling ? Icons.call_end_rounded : Icons.phone_rounded,
                 ),
                 label: Text(
                   isCalling

@@ -251,8 +251,7 @@ class _AccessibilityPageState extends State<AccessibilityPage> {
                     ScaffoldMessenger.of(this.context).showSnackBar(
                       SnackBar(
                         content: Text(
-                          'Güvenli arama isteği ${selectedContact.name} için kaydedildi.',
-                        ),
+'${selectedContact.name} için güvenli arama başlatıldı.',                        ),
                       ),
                     );
                   });

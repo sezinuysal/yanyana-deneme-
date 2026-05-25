@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
+
 import 'package:yanyana_p/core/theme/theme.dart';
+import 'package:yanyana_p/live_caption_page.dart';
+import 'package:yanyana_p/push_notification_page.dart';
+import 'package:yanyana_p/safe_call_page.dart';
 
 class VoiceCommandPage extends StatefulWidget {
   const VoiceCommandPage({super.key});
@@ -13,6 +17,7 @@ class _VoiceCommandPageState extends State<VoiceCommandPage> {
   final stt.SpeechToText _speech = stt.SpeechToText();
 
   bool _isListening = false;
+
   String _recognizedText = "Henüz bir komut algılanmadı.";
   String _commandResult = "Komut sonucu burada görünecek.";
 
@@ -31,10 +36,13 @@ class _VoiceCommandPageState extends State<VoiceCommandPage> {
         onResult: (result) {
           if (!mounted) return;
 
+          final command = result.recognizedWords.toLowerCase();
+
           setState(() {
             _recognizedText = result.recognizedWords;
-            _commandResult = _getCommandResult(result.recognizedWords);
           });
+
+          _handleVoiceCommand(command);
         },
       );
     } else {
@@ -45,24 +53,88 @@ class _VoiceCommandPageState extends State<VoiceCommandPage> {
     }
   }
 
-  String _getCommandResult(String command) {
-    final lowerCommand = command.toLowerCase();
-
+  void _handleVoiceCommand(String command) {
     if (command.trim().isEmpty) {
-      return "Komut bekleniyor.";
-    } else if (lowerCommand.contains("sos") ||
-        lowerCommand.contains("yardım")) {
-      return "SOS komutu algılandı. Acil yardım işlemi başlatılabilir.";
-    } else if (lowerCommand.contains("arama") ||
-        lowerCommand.contains("ara")) {
-      return "Güvenli arama komutu algılandı.";
-    } else if (lowerCommand.contains("altyazı")) {
-      return "Canlı altyazı komutu algılandı.";
-    } else if (lowerCommand.contains("sesli okuma") ||
-        lowerCommand.contains("oku")) {
-      return "Sesli okuma komutu algılandı.";
-    } else {
-      return "Komut algılandı ancak eşleşen bir işlem bulunamadı.";
+      setState(() {
+        _commandResult = "Komut bekleniyor.";
+      });
+      return;
+    }
+
+    // SOS / Yardım
+    if (command.contains("yardım") || command.contains("sos")) {
+      setState(() {
+        _commandResult = "Acil yardım komutu çalıştırıldı.";
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Acil yardım bildirimi gönderildi."),
+        ),
+      );
+    }
+
+    // Güvenli Arama
+    else if (command.contains("safe call") ||
+        command.contains("güvenli arama") ||
+        command.contains("arama")) {
+      setState(() {
+        _commandResult = "Safe Call ekranı açılıyor.";
+      });
+
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => const SafeCallPage(),
+        ),
+      );
+    }
+
+    // Canlı Altyazı
+    else if (command.contains("altyazı")) {
+      setState(() {
+        _commandResult = "Canlı altyazı ekranı açılıyor.";
+      });
+
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => const LiveCaptionPage(),
+        ),
+      );
+    }
+
+    // Push Notification
+    else if (command.contains("bildirim") ||
+        command.contains("notification")) {
+      setState(() {
+        _commandResult = "Push notification ekranı açılıyor.";
+      });
+
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => const PushNotificationPage(),
+        ),
+      );
+    }
+
+    // Geri dön
+    else if (command.contains("geri dön") ||
+        command.contains("kapat")) {
+      setState(() {
+        _commandResult = "Sayfa kapatılıyor.";
+      });
+
+      Navigator.pop(context);
+    }
+
+    // Bilinmeyen komut
+    else {
+      setState(() {
+        _commandResult =
+            "Komut algılandı ancak eşleşen işlem bulunamadı.";
+      });
     }
   }
 
@@ -125,7 +197,9 @@ class _VoiceCommandPageState extends State<VoiceCommandPage> {
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
-                  _isListening ? Icons.hearing_rounded : Icons.mic_rounded,
+                  _isListening
+                      ? Icons.hearing_rounded
+                      : Icons.mic_rounded,
                   size: _isListening ? 60 : 55,
                   color: _isListening
                       ? YanYanaColors.sos
@@ -228,44 +302,27 @@ class _VoiceCommandPageState extends State<VoiceCommandPage> {
 
               const SizedBox(height: 20),
 
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: YanYanaColors.surface,
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(color: YanYanaColors.divider),
-                ),
-                child: const Text(
-                  "Örnek komutlar: “SOS gönder”, “yardım çağır”, “güvenli arama başlat”, “canlı altyazıyı aç”, “sesli okuma aç”.",
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: YanYanaColors.textMuted,
-                    fontSize: 12.5,
-                    height: 1.35,
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 30),
-
               SizedBox(
                 width: double.infinity,
                 height: 55,
                 child: DecoratedBox(
                   decoration: BoxDecoration(
-                    gradient: _isListening ? sosGradient : primaryGradient,
+                    gradient:
+                        _isListening ? sosGradient : primaryGradient,
                     borderRadius: BorderRadius.circular(18),
                   ),
                   child: ElevatedButton.icon(
-                    onPressed: _isListening ? _stopListening : _startListening,
+                    onPressed:
+                        _isListening ? _stopListening : _startListening,
                     icon: Icon(
                       _isListening
                           ? Icons.stop_rounded
                           : Icons.keyboard_voice_rounded,
                     ),
                     label: Text(
-                      _isListening ? "Dinlemeyi Durdur" : "Dinlemeyi Başlat",
+                      _isListening
+                          ? "Dinlemeyi Durdur"
+                          : "Dinlemeyi Başlat",
                     ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.transparent,
